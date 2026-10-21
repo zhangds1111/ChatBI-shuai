@@ -1,0 +1,181 @@
+============================================================
+ChatBI Text2SQL 评估报告
+============================================================
+总用例数：27
+Execution Accuracy：23/27 = 85.2%
+Exact Match Accuracy：0/27 = 0.0%
+执行失败数：0
+
+按难度分类统计：
+
+详细结果：
+
+[T01] time     | 通过
+  问题：上个月卖了多少钱?
+  生成 SQL：SELECT
+    SUM(o.item_amount * r.rate_to_cny) AS sales_cny
+FROM amz_order_items ...
+
+[T02] time     | 通过
+  问题：9月的GMV是多少?
+  生成 SQL：SELECT
+    COALESCE(SUM(o.item_amount * r.rate_to_cny), 0) AS gmv_cny
+FROM amz_o...
+
+[T03] time     | 通过
+  问题：最近7天的销售额是多少?
+  生成 SQL：SELECT
+    SUM(o.item_amount * r.rate_to_cny) AS sales_cny
+FROM amz_order_items ...
+
+[T04] time     | 通过
+  问题：上周的销售额是多少?
+  生成 SQL：SELECT
+    SUM(o.item_amount * r.rate_to_cny) AS sales_cny
+FROM amz_order_items ...
+
+[T05] time     | 通过
+  问题：本月客单价是多少?
+  生成 SQL：SELECT
+    SUM(o.item_amount * r.rate_to_cny) / NULLIF(COUNT(DISTINCT o.order_id...
+
+[S01] sales    | 通过
+  问题：上个月订单量是多少?
+  生成 SQL：SELECT
+    COUNT(DISTINCT order_id) AS order_count
+FROM amz_order_items
+WHERE or...
+
+[S02] sales    | 通过
+  问题：各国家上个月销售额排名
+  生成 SQL：SELECT
+    s.marketplace,
+    SUM(o.item_amount * r.rate_to_cny) AS sales_cny
+FR...
+
+[S03] sales    | 通过
+  问题：销售额最高的10个商品(ASIN)
+  生成 SQL：SELECT
+    o.asin,
+    SUM(o.item_amount * r.rate_to_cny) AS sales_cny
+FROM amz_...
+
+[S04] sales    | 通过
+  问题：上个月人民币毛利率是多少?
+  生成 SQL：SELECT
+  (
+    SUM(o.item_amount * r.rate_to_cny)
+    - SUM((p.unit_cost + p.hea...
+
+[A01] ads      | 通过
+  问题：上个月广告花费是多少?
+  生成 SQL：SELECT
+    SUM(a.spend * r.rate_to_cny) AS ad_spend_cny
+FROM amz_ads_daily a
+JOI...
+
+[A02] ads      | 通过
+  问题：上个月的ROAS是多少?
+  生成 SQL：SELECT
+    SUM(a.sales_7d * r.rate_to_cny) / NULLIF(SUM(a.spend * r.rate_to_cny)...
+
+[A03] ads      | 通过
+  问题：上个月的ACOS是多少?
+  生成 SQL：SELECT
+    SUM(a.spend * r.rate_to_cny) / NULLIF(SUM(a.sales_7d * r.rate_to_cny)...
+
+[A04] ads      | 通过
+  问题：上个月的TACOS是多少?
+  生成 SQL：WITH ad_spend AS (
+    SELECT
+        SUM(a.spend * r.rate_to_cny) AS ad_spend_c...
+
+[A05] ads      | 通过
+  问题：UK站点上个月的广告点击率是多少?
+  生成 SQL：SELECT
+    SUM(a.clicks) / NULLIF(SUM(a.impressions), 0) * 100 AS ad_ctr_pct
+FRO...
+
+[F01] traffic  | 通过
+  问题：本月Buy Box占比是多少?
+  生成 SQL：SELECT
+    SUM(buy_box_pct * sessions) / NULLIF(SUM(sessions), 0) AS buy_box_pct...
+
+[F02] traffic  | 通过
+  问题：本月转化率是多少?
+  生成 SQL：SELECT
+    SUM(t.units_ordered) / NULLIF(SUM(t.sessions), 0) * 100 AS conversion...
+
+[F03] traffic  | 通过
+  问题：宠物用品最近30天的会话数是多少?
+  生成 SQL：SELECT
+    SUM(t.sessions) AS sessions
+FROM amz_traffic_daily t
+WHERE t.report_d...
+
+[I01] inventory | 不匹配
+  问题：现在库存还能卖几天?
+  生成 SQL：WITH inventory_latest AS (
+    SELECT SUM(available_qty) AS fba_available_qty
+  ...
+  预期行数：1, 生成行数：1
+
+[I02] inventory | 不匹配
+  问题：老库存占比多少?
+  生成 SQL：SELECT
+    SUM(age_181_270_qty + age_271_365_qty + age_365_plus_qty) * 100.0 /
+ ...
+  预期行数：1, 生成行数：1
+
+[I03] inventory | 通过
+  问题：当前FBA可售库存是多少件?
+  生成 SQL：SELECT SUM(available_qty) AS available_qty
+FROM amz_fba_inventory
+WHERE snapshot...
+
+[P01] settlement | 不匹配
+  问题：本月平台费用是多少?
+  生成 SQL：SELECT
+    -SUM(s.amount * r.rate_to_cny) AS platform_fee_cny
+FROM amz_settlemen...
+  预期行数：1, 生成行数：1
+
+[P02] profit   | 通过
+  问题：这个月赚了多少钱?
+  生成 SQL：WITH order_metrics AS (
+    SELECT
+        COALESCE(SUM(o.item_amount * r.rate_t...
+
+[R01] returns  | 通过
+  问题：哪个品类的退货率最高?
+  生成 SQL：WITH sales AS (
+    SELECT
+        p.category,
+        SUM(o.quantity) AS units_...
+
+[R02] returns  | 不匹配
+  问题：退货原因分布是怎样的?
+  生成 SQL：SELECT
+    reason,
+    COUNT(DISTINCT order_id) AS return_order_count,
+    SUM(q...
+  预期行数：7, 生成行数：7
+
+[D01] dimension | 通过
+  问题：运营A负责的店铺上个月销售额是多少?
+  生成 SQL：SELECT
+    SUM(o.item_amount * r.rate_to_cny) AS sales_cny
+FROM amz_order_items ...
+
+[M01] multi    | 通过
+  问题：各品类上个月的销售额和广告花费分别是多少?
+  生成 SQL：WITH sales_agg AS (
+    SELECT
+        COALESCE(NULLIF(p.category, ''), '未知') AS...
+
+[M02] multi    | 通过
+  问题：各站点本月利润是多少?
+  生成 SQL：WITH marketplaces AS (
+    SELECT DISTINCT marketplace
+    FROM dim_stores
+    W...

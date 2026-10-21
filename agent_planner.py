@@ -19,9 +19,11 @@ import pymysql
 from pydantic import BaseModel, Field
 
 from config import DB_CONFIG
-from main import ChatBISystem
+from main import ChatBISystem, _sse_event
 from query_decomposer import DecompositionPlan, DecomposedTask, QueryDecomposer
 from report_generator import ReportGenerator
+from security import UserContext
+from tracing import reduce_sse, reduce_step_events, traceable
 
 
 class PlanStep(BaseModel):
@@ -85,6 +87,7 @@ class ExecutionSummary(BaseModel):
 class PlanGenerator:
     """根据拆解结果生成可执行计划。"""
 
+    @traceable(name="执行计划生成", run_type="chain")
     def build_plan(
         self,
         original_question: str,
@@ -328,8 +331,10 @@ class StepExecutor:
         storage_backend: Literal["memory", "temp_table"] = "memory",
         result_store: IntermediateResultStore | None = None,
         storage_connection_factory: Callable[[], Any] | None = None,
+        security_context: UserContext | None = None,
     ):
         self.system = chatbi_system
+        self.security_context = security_context
         self.chatbi_run_options = chatbi_run_options or {
             "use_schema_linking": True,
             "use_indicator_rag": True,
@@ -355,10 +360,32 @@ class StepExecutor:
         max_steps: int | None = None,
     ) -> list[StepExecutionResult]:
         results: list[StepExecutionResult] = []
+        for event_type, payload in self.iter_execute_plan(plan, max_steps=max_steps):
+            if event_type == "step_done":
+                results.append(payload)
+        return results
+
+    @traceable(
+        name="计划执行",
+        run_type="chain",
+        reduce_fn=reduce_step_events,
+    )
+    def iter_execute_plan(
+        self,
+        plan: ExecutionPlan,
+        max_steps: int | None = None,
+    ):
+        """按步骤迭代执行计划，逐个 yield 事件，供流式输出复用。
+
+        Yields:
+            ("step_start", dict) —— 单步开始前的进度信息（含步骤定义与依赖）
+            ("step_done", StepExecutionResult) —— 单步执行结果（含跳过步骤）
+        """
         results_by_step: dict[str, StepExecutionResult] = {}
         steps_to_run = plan.steps[:max_steps] if max_steps is not None else plan.steps
         abort_triggered = False
         total_steps = len(steps_to_run)
+        completed_steps = failed_steps = skipped_steps = 0
 
         _print_progress(f"开始执行计划，共 {total_steps} 个步骤。")
 
@@ -371,8 +398,9 @@ class StepExecutor:
                     step=step,
                     error="前序步骤失败，当前执行策略为 abort，后续步骤停止执行。",
                 )
-                results.append(skipped)
+                skipped_steps += 1
                 results_by_step[step.step_id] = skipped
+                yield "step_done", skipped
                 continue
 
             if self._has_failed_dependency(step.depends_on, results_by_step):
@@ -383,8 +411,9 @@ class StepExecutor:
                     step=step,
                     error="依赖步骤失败，当前步骤已跳过。",
                 )
-                results.append(skipped)
+                skipped_steps += 1
                 results_by_step[step.step_id] = skipped
+                yield "step_done", skipped
                 continue
 
             _print_progress(
@@ -395,10 +424,29 @@ class StepExecutor:
                 results_by_step,
             )
             composed_question = self._compose_question(step.question, dependency_context)
+            yield "step_start", {
+                "step_id": step.step_id,
+                "task_id": step.task_id,
+                "step_name": step.step_name,
+                "task_type": step.task_type,
+                "question": composed_question,
+                "description": step.description,
+                "depends_on": step.depends_on,
+                "expected_output": step.expected_output,
+                "index": index,
+                "total": total_steps,
+            }
             normalized = self._execute_with_retry(
                 step=step,
                 question=composed_question,
                 context_used=dependency_context,
+                langsmith_extra={
+                    "name": f"步骤执行:{step.step_id}",
+                    "metadata": {
+                        "step_name": step.step_name,
+                        "task_type": step.task_type,
+                    },
+                },
             )
             if normalized.success:
                 normalized.result_reference = self._store_intermediate_result(
@@ -410,26 +458,25 @@ class StepExecutor:
                 _print_progress(
                     f"{step.step_id} 执行完成：{step.step_name}"
                 )
+                completed_steps += 1
             elif self.failure_policy == "abort":
                 _print_progress(
                     f"{step.step_id} 执行失败：{normalized.error or '未知错误'}"
                 )
                 abort_triggered = True
+                failed_steps += 1
             else:
                 _print_progress(
                     f"{step.step_id} 执行失败：{normalized.error or '未知错误'}"
                 )
+                failed_steps += 1
 
-            results.append(normalized)
             results_by_step[step.step_id] = normalized
+            yield "step_done", normalized
 
-        completed_steps = sum(1 for result in results if result.status == "completed")
-        failed_steps = sum(1 for result in results if result.status == "failed")
-        skipped_steps = sum(1 for result in results if result.status == "skipped")
         _print_progress(
             f"执行计划结束：completed={completed_steps}, failed={failed_steps}, skipped={skipped_steps}"
         )
-        return results
 
     def _run_with_chatbi(self, question: str) -> dict[str, Any]:
         if self.system is None:
@@ -437,9 +484,11 @@ class StepExecutor:
 
         return self.system.run(
             user_question=question,
+            security_context=self.security_context,
             **self.chatbi_run_options,
         )
 
+    @traceable(name="步骤执行", run_type="chain")
     def _execute_with_retry(
         self,
         step: PlanStep,
@@ -640,6 +689,7 @@ class StepExecutor:
 class ResultSummarizer:
     """把多步执行结果收敛为统一摘要。"""
 
+    @traceable(name="结果汇总", run_type="chain")
     def summarize(
         self,
         original_question: str,
@@ -737,6 +787,7 @@ class PlanAndExecuteAgent:
         self.summarizer = summarizer or ResultSummarizer()
         self.report_generator = report_generator or ReportGenerator()
 
+    @traceable(name="智能体执行链路", run_type="chain")
     def run(
         self,
         user_question: str,
@@ -777,6 +828,84 @@ class PlanAndExecuteAgent:
             "summary": summary.model_dump(),
             "report": report.model_dump(),
         }
+
+    @traceable(
+        name="智能体执行链路（流式）",
+        run_type="chain",
+        reduce_fn=reduce_sse,
+    )
+    def run_stream(
+        self,
+        user_question: str,
+        decomposition_override: dict[str, Any] | None = None,
+        max_steps: int | None = None,
+    ):
+        """流式运行 Plan-and-Execute 链路，按阶段 yield SSE 事件字符串。
+
+        事件类型：
+        - decompose_done: 问题差分（拆解出的子任务列表）
+        - plan_done: 执行计划（步骤、依赖、预期输出）
+        - step_start: 子任务开始执行
+        - step_done: 子任务执行结果（含 SQL、数据、错误）
+        - summary_done: 执行摘要
+        - report_done: 最终分析报告
+        - error: 链路级异常
+        - done: 链路结束（含成功/失败/跳过步骤数）
+        """
+        try:
+            if decomposition_override is not None:
+                _print_progress("使用传入的拆解结果，跳过任务拆解。")
+                decomposition = decomposition_override
+            else:
+                _print_progress("开始任务拆解。")
+                decomposition = self.decomposer.decompose(user_question)
+
+            yield _sse_event("decompose_done", {
+                "original_question": user_question,
+                **decomposition,
+            })
+
+            _print_progress("开始生成执行计划。")
+            plan = self.planner.build_plan(user_question, decomposition)
+            yield _sse_event("plan_done", {"plan": plan.model_dump()})
+
+            step_results: list[StepExecutionResult] = []
+            for event_type, payload in self.executor.iter_execute_plan(
+                plan, max_steps=max_steps
+            ):
+                if event_type == "step_start":
+                    yield _sse_event("step_start", payload)
+                else:
+                    step_results.append(payload)
+                    yield _sse_event("step_done", payload.model_dump())
+
+            _print_progress("开始生成执行摘要。")
+            summary = self.summarizer.summarize(user_question, plan, step_results)
+            yield _sse_event("summary_done", {"summary": summary.model_dump()})
+
+            _print_progress("开始生成分析报告。")
+            report = self.report_generator.generate(
+                original_question=user_question,
+                analysis_goal=plan.analysis_goal,
+                step_results=[result.model_dump() for result in step_results],
+                summary=summary.model_dump(),
+            )
+            yield _sse_event("report_done", {"report": report.model_dump()})
+
+            completed = sum(1 for r in step_results if r.status == "completed")
+            failed = sum(1 for r in step_results if r.status == "failed")
+            skipped = sum(1 for r in step_results if r.status == "skipped")
+            yield _sse_event("done", {
+                "completed_steps": completed,
+                "failed_steps": failed,
+                "skipped_steps": skipped,
+            })
+        except Exception as e:
+            _print_progress(f"Agent 链路异常：{e}")
+            yield _sse_event("error", {
+                "error": str(e),
+                "error_type": "agent",
+            })
 
 
 def _json_default(value: Any) -> str:

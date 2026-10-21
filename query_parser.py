@@ -5,10 +5,13 @@
 当前版本仅做简单校验，后续课程中可扩展为意图识别、实体提取等复杂功能。
 """
 
+from tracing import traceable
+
 
 class QueryParser:
     """用户查询解析器"""
 
+    @traceable(name="查询解析", run_type="parser")
     def parse(self, user_input: str) -> dict:
         """
         解析用户输入

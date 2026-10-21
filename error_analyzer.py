@@ -6,7 +6,10 @@
 """
 
 import re
+from datetime import date
 from typing import Optional
+
+from tracing import traceable, trim_check_outputs
 
 
 class ErrorAnalyzer:
@@ -131,25 +134,25 @@ class ErrorAnalyzer:
 
     def _check_field_error(self, sql: str, question: Optional[str]) -> bool:
         """检测字段选择错误"""
-        # 问题问收入但 SQL 用了 gross_amount
+        # 问题问销售额但 SQL 误用 tax_amount / shipping_amount 口径
         if question and ("收入" in question or "销售额" in question):
-            if "gross_amount" in sql and "net_amount" not in sql:
+            if ("tax_amount" in sql or "shipping_amount" in sql) and "item_amount" not in sql:
                 return True
-        # 问题问成本但 SQL 用了 standard_cost
+        # 问题问成本但 SQL 只取采购成本、漏了头程运费
         if question and "成本" in question:
-            if "standard_cost" in sql and "material_cost" not in sql:
+            if "unit_cost" in sql and "head_freight_cost" not in sql:
                 return True
         return False
 
     def _check_join_error(self, sql: str, question: Optional[str]) -> bool:
         """检测 Join 关联错误"""
-        # 涉及收入/销售额但未关联汇率表
+        # 涉及多币种金额但未关联汇率表
         if question and ("收入" in question or "销售额" in question):
             if "exchange_rates" not in sql and "currency" in sql:
                 return True
-        # 涉及客户/产品维度但未关联对应维度表
-        if question and ("客户" in question or "产品线" in question):
-            if "dim_customers" not in sql and "dim_products" not in sql:
+        # 涉及站点/品类维度但未关联对应维度表
+        if question and ("站点" in question or "品类" in question or "商品" in question):
+            if "dim_stores" not in sql and "dim_products" not in sql:
                 return True
         return False
 
@@ -272,3 +275,128 @@ class ErrorAnalyzer:
             lines.append(f"    建议：{r['suggestion']}")
 
         return "\n".join(lines)
+
+
+# ==================== SQL 校验：时间边界 ====================
+# 封闭时间区间词（time_rules.json 的 must_have_both_bounds）：
+# 必须同时有下界和上界，只有下界会把当期数据一起算进去。
+_CLOSED_TIME_TERMS = ("上个月", "上月", "上周", "上季度", "去年")
+
+# 日期字面量 / 日期函数调用，用于识别与时间字段比较的边界
+_DATE_EXPR = (
+    r"(?:CURDATE\s*\(|DATE_SUB\s*\(|DATE_ADD\s*\(|DATE_FORMAT\s*\(|"
+    r"MAKEDATE\s*\(|STR_TO_DATE\s*\(|'\d{4}-\d{2}-\d{2}')"
+)
+
+
+@traceable(name="时间边界校验", run_type="tool", process_outputs=trim_check_outputs)
+def check_time_bounds(question: Optional[str], sql: Optional[str]) -> Optional[str]:
+    """校验封闭时间区间的上下界完整性。
+
+    问题含「上个月/上周/上季度/去年」等封闭区间词，而 SQL 只有下界
+    （如 ``>= DATE_SUB(...)``）没有上界时，返回问题描述，供调用方打回
+    LLM 重写；合规或与时间无关时返回 None。
+    """
+    if not question or not sql:
+        return None
+    hit = next((t for t in _CLOSED_TIME_TERMS if t in question), None)
+    if not hit:
+        return None
+
+    # BETWEEN a AND b 自带上下界
+    if re.search(rf"BETWEEN\s+{_DATE_EXPR}\s+AND\s+{_DATE_EXPR}", sql, re.IGNORECASE):
+        return None
+
+    lower = re.search(rf"(?:>=|>)\s*{_DATE_EXPR}", sql, re.IGNORECASE) or re.search(
+        rf"{_DATE_EXPR}\s*(?:>=|>)", sql, re.IGNORECASE
+    )
+    # < 的上界匹配需排除 <> 与 <= 之外的比较；<= 合法，<> 不算边界
+    upper = re.search(rf"(?:<=|<(?!>))\s*{_DATE_EXPR}", sql, re.IGNORECASE) or re.search(
+        rf"{_DATE_EXPR}\s*(?:<=|<(?!>))", sql, re.IGNORECASE
+    )
+    if lower and not upper:
+        return (
+            f"问题中的「{hit}」是封闭时间区间，SQL 只有下界没有上界。"
+            f"必须同时写下界和上界（例如「上个月」："
+            f">= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') "
+            f"AND < DATE_FORMAT(CURDATE(), '%Y-%m-01')），"
+            f"不能只写 >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH) 这类滚动下界。"
+        )
+    return None
+
+
+# ==================== SQL 校验：日期字面量年份 ====================
+# 「9月」「8月」这类不带年份的月份，以及「上个月」，LLM 没有当前日期锚点时
+# 会把年份猜错（如 2026 年问「9月」却生成 2025-09 的条件）。此校验按问题语义
+# 推算出合法年份集合，不在集合内的日期字面量即打回重写。
+
+_YEAR_LITERAL_RE = re.compile(r"'(20\d{2})-(\d{2})-(\d{2})'")
+_YEAR_IN_QUESTION_RE = re.compile(r"(20\d{2})\s*年?")
+_MONTH_IN_QUESTION_RE = re.compile(r"(?<![\d个])(\d{1,2})\s*月")
+
+
+@traceable(name="日期年份校验", run_type="tool", process_outputs=trim_check_outputs)
+def check_date_year(
+    question: Optional[str], sql: Optional[str], today: Optional[date] = None
+) -> Optional[str]:
+    """校验 SQL 中硬编码日期字面量的年份是否符合问题语义。
+
+    规则（``today`` 可注入以便测试）：
+    - 问题写了明确年份（如「2025年9月」）→ 允许该年及其下界跨年的 +1 年
+    - 问题含「去年」→ 允许去年、今年（12月下界会写到次年 1 月 1 日）
+    - 问题含「上个月/上月」→ 允许上个自然月所在年（及其 +1 年跨年边界）
+    - 问题含「N月」（不带年份）→ 允许「最近一个已过完的该月」所在年（及其 +1 年）
+    - 问题无任何时间语义 → 不校验；SQL 全部用日期函数（无字面量）→ 不校验
+
+    返回问题描述（供打回重写）或 None。
+    """
+    if not question or not sql:
+        return None
+    literals = _YEAR_LITERAL_RE.findall(sql)
+    if not literals:
+        return None  # 全动态日期，不猜年份，无从判错
+
+    today = today or date.today()
+    cur_year, cur_month = today.year, today.month
+
+    allowed: set[int] = set()
+    expected_desc = []
+
+    explicit_years = sorted({int(y) for y in _YEAR_IN_QUESTION_RE.findall(question)})
+    if explicit_years:
+        for y in explicit_years:
+            allowed.update({y, y + 1})  # y+1：12 月的上界会写成次年 1 月 1 日
+            expected_desc.append(f"{y} 年")
+    else:
+        if "去年" in question:
+            allowed.update({cur_year - 1, cur_year})
+            expected_desc.append(f"去年（{cur_year - 1} 年）")
+        if "上个月" in question or "上月" in question:
+            last_month_year = cur_year - 1 if cur_month == 1 else cur_year
+            allowed.update({last_month_year, last_month_year + 1})
+            expected_desc.append("上个自然月")
+        for m_raw in _MONTH_IN_QUESTION_RE.findall(question):
+            month = int(m_raw)
+            if not 1 <= month <= 12:
+                continue
+            # 最近一个已过完（或正在经历）的该月份
+            month_year = cur_year if cur_month >= month else cur_year - 1
+            allowed.update({month_year, month_year + 1})
+            expected_desc.append(f"{month} 月（{month_year} 年）")
+
+    if not allowed:
+        return None  # 问题无时间语义，不拦
+
+    bad_years = sorted({int(y) for y, _, _ in literals if int(y) not in allowed})
+    if not bad_years:
+        return None
+
+    found = sorted({f"{y}-{m}-{d}" for y, m, d in literals if int(y) in bad_years})
+    return (
+        f"SQL 中硬编码的日期字面量年份与问题语义不符："
+        f"问题时间应为 {'、'.join(expected_desc)}（今天是 {today.isoformat()}），"
+        f"但 SQL 出现了 {found[0]} 等 {bad_years[0]} 年的日期"
+        f"{'、' + found[-1] if len(found) > 1 else ''}。"
+        f"请按正确的年份重新生成日期条件"
+        f"（或改用 CURDATE()/DATE_FORMAT 等日期函数动态计算）。"
+    )

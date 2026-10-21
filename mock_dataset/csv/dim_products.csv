@@ -1,0 +1,51 @@
+store_id,msku,sku,asin,parent_asin,product_name,category,owner,unit_cost,head_freight_cost,launch_date,status
+US01,HS-001-US,HS-001,B0Z54PVBZ0,B0B5R2ZY5A,Foldable Storage Bin (折叠收纳箱),家居收纳,产品经理甲,56.0,12.0,2025-11-01,Active
+US01,HS-002-US,HS-002,B0RA78X5F0,B0RFCJMEP2,Hanging Closet Organizer (衣柜挂袋),家居收纳,产品经理甲,36.0,8.0,2025-11-01,Active
+US01,KT-001-US,KT-001,B0Z1ZFGA63,B0TE9CTEVE,Silicone Spatula Set (硅胶锅铲套装),厨房用品,产品经理甲,44.0,10.0,2025-10-01,Active
+US01,KT-002-US,KT-002,B0VPG4ASB4,B0PJWAV0GB,Stainless Steel Insulated Tumbler (不锈钢保温杯),厨房用品,产品经理甲,70.0,14.0,2025-10-01,Active
+US01,KT-003-US,KT-003,B0ZS3U9W2Y,B0QWZ5GTB1,Electric Hand Mixer (电动打蛋器),厨房用品,产品经理甲,104.0,18.0,2026-01-10,Active
+US01,OD-001-US,OD-001,B0TDCCQ7BN,B0BXDB9M5Z,Rechargeable Camping Lantern (户外露营灯),户外运动,产品经理乙,82.0,16.0,2026-01-10,Active
+US01,OD-002-US,OD-002,B0Q1X4ZTX2,B04RU94V84,Folding Camping Chair (折叠露营椅),户外运动,产品经理乙,170.0,44.0,2026-02-01,Active
+US01,OD-003-US,OD-003,B0TUV3BCWU,B0ZJ05R2L1,Sports Water Bottle (运动水壶),户外运动,产品经理乙,32.0,6.0,2026-02-01,Active
+US01,PT-001-US,PT-001,B01A38Y2QV,B0W09EDHBX,Automatic Pet Feeder (宠物自动喂食器),宠物用品,产品经理乙,140.0,24.0,2026-02-15,Active
+US01,PT-002-US,PT-002,B0XN8DUDR4,B0NSN1L7XJ,Dog Leash (宠物牵引绳),宠物用品,产品经理乙,28.0,6.0,2026-02-15,Active
+US01,PT-003-US,PT-003,B079JU32YE,B0LR8912J3,Cat Scratching Board (猫抓板),宠物用品,产品经理乙,40.0,10.0,2025-12-01,Active
+US01,HL-001-US,HL-001,B0L9XP30P0,B0BSH34RZ9,Motion Sensor Night Light (智能感应夜灯),家居照明,产品经理甲,48.0,10.0,2026-09-15,Active
+US01,PT-004-US,PT-004,B0CF96SK91,B00HL9N181,Pet Grooming Brush (宠物梳),宠物用品,产品经理乙,24.0,6.0,2025-09-01,Inactive
+CA01,HS-001-CA,HS-001,B0FXELJBB6,B037MEEC5L,Foldable Storage Bin (折叠收纳箱),家居收纳,产品经理甲,56.0,13.2,2025-11-01,Active
+CA01,HS-002-CA,HS-002,B0JUC98SU4,B0E654ZQBE,Hanging Closet Organizer (衣柜挂袋),家居收纳,产品经理甲,36.0,8.8,2025-11-01,Active
+CA01,KT-001-CA,KT-001,B019BP2Q50,B0923BQFSM,Silicone Spatula Set (硅胶锅铲套装),厨房用品,产品经理甲,44.0,11.0,2025-10-01,Active
+CA01,KT-002-CA,KT-002,B0G6R33LJ7,B05JXJF3NF,Stainless Steel Insulated Tumbler (不锈钢保温杯),厨房用品,产品经理甲,70.0,15.4,2025-10-01,Active
+CA01,KT-003-CA,KT-003,B0NGG8QU1A,B0VRQSD13Z,Electric Hand Mixer (电动打蛋器),厨房用品,产品经理甲,104.0,19.8,2026-01-10,Active
+CA01,OD-001-CA,OD-001,B047NFH9WZ,B0234R7ZZ1,Rechargeable Camping Lantern (户外露营灯),户外运动,产品经理乙,82.0,17.6,2026-01-10,Active
+CA01,OD-002-CA,OD-002,B0Z54AXCXJ,B0N1XNE9EW,Folding Camping Chair (折叠露营椅),户外运动,产品经理乙,170.0,48.4,2026-02-01,Active
+CA01,OD-003-CA,OD-003,B08ACZ0ZM7,B0CNJMLBK9,Sports Water Bottle (运动水壶),户外运动,产品经理乙,32.0,6.6,2026-02-01,Active
+CA01,PT-001-CA,PT-001,B09MY9GK01,B09GYQC750,Automatic Pet Feeder (宠物自动喂食器),宠物用品,产品经理乙,140.0,26.4,2026-02-15,Active
+CA01,PT-002-CA,PT-002,B0FL8CC3QD,B0JGW3M55E,Dog Leash (宠物牵引绳),宠物用品,产品经理乙,28.0,6.6,2026-02-15,Active
+CA01,PT-003-CA,PT-003,B0ADLWFCC6,B0M64AXWLB,Cat Scratching Board (猫抓板),宠物用品,产品经理乙,40.0,11.0,2025-12-01,Active
+CA01,PT-004-CA,PT-004,B05LGETLMR,B0QA5364L6,Pet Grooming Brush (宠物梳),宠物用品,产品经理乙,24.0,6.6,2025-09-01,Inactive
+UK01,HS-001-UK,HS-001,B03KAMUMVY,B0PH1YNDRT,Foldable Storage Bin (折叠收纳箱),家居收纳,产品经理甲,56.0,15.0,2025-11-01,Active
+UK01,HS-002-UK,HS-002,B00GLB4UWY,B0ZHD5XSB3,Hanging Closet Organizer (衣柜挂袋),家居收纳,产品经理甲,36.0,10.0,2025-11-01,Active
+UK01,KT-001-UK,KT-001,B0ANUBSGW2,B0N4XN0HWP,Silicone Spatula Set (硅胶锅铲套装),厨房用品,产品经理甲,44.0,12.5,2025-10-01,Active
+UK01,KT-002-UK,KT-002,B021XUBXFN,B0EX33RZRB,Stainless Steel Insulated Tumbler (不锈钢保温杯),厨房用品,产品经理甲,70.0,17.5,2025-10-01,Active
+UK01,KT-003-UK,KT-003,B0EN4LM28C,B0UPV5L0B3,Electric Hand Mixer (电动打蛋器),厨房用品,产品经理甲,104.0,22.5,2026-01-10,Active
+UK01,OD-001-UK,OD-001,B0FPHGFC6A,B0GWW3D1W7,Rechargeable Camping Lantern (户外露营灯),户外运动,产品经理乙,82.0,20.0,2026-01-10,Active
+UK01,OD-002-UK,OD-002,B0QYU7Y01G,B0XCXTNJJW,Folding Camping Chair (折叠露营椅),户外运动,产品经理乙,170.0,55.0,2026-02-01,Active
+UK01,OD-003-UK,OD-003,B0YSDTQKUL,B0LRP7Y4YX,Sports Water Bottle (运动水壶),户外运动,产品经理乙,32.0,7.5,2026-02-01,Active
+UK01,PT-001-UK,PT-001,B0SM1Q3ECP,B0B30C15V1,Automatic Pet Feeder (宠物自动喂食器),宠物用品,产品经理乙,140.0,30.0,2026-02-15,Active
+UK01,PT-002-UK,PT-002,B0SPY8PHMJ,B0MNGNST2P,Dog Leash (宠物牵引绳),宠物用品,产品经理乙,28.0,7.5,2026-02-15,Active
+UK01,PT-003-UK,PT-003,B0Z07TEGDZ,B0J67JA5DX,Cat Scratching Board (猫抓板),宠物用品,产品经理乙,40.0,12.5,2025-12-01,Active
+UK01,HL-001-UK,HL-001,B0BZBJ6CC1,B0E1QR76V7,Motion Sensor Night Light (智能感应夜灯),家居照明,产品经理甲,48.0,12.5,2026-09-15,Active
+UK01,PT-004-UK,PT-004,B0LX1NH9AL,B0RCAJEEUQ,Pet Grooming Brush (宠物梳),宠物用品,产品经理乙,24.0,7.5,2025-09-01,Inactive
+DE01,HS-001-DE,HS-001,B0LRQ7QR4V,B04Y5JJYTT,Foldable Storage Bin (折叠收纳箱),家居收纳,产品经理甲,56.0,15.0,2025-11-01,Active
+DE01,HS-002-DE,HS-002,B01TH21MDL,B0Z4QTWZJT,Hanging Closet Organizer (衣柜挂袋),家居收纳,产品经理甲,36.0,10.0,2025-11-01,Active
+DE01,KT-001-DE,KT-001,B0CYCGQ6RM,B07HAUFKUV,Silicone Spatula Set (硅胶锅铲套装),厨房用品,产品经理甲,44.0,12.5,2025-10-01,Active
+DE01,KT-002-DE,KT-002,B065XX9D12,B0BSQTGGX5,Stainless Steel Insulated Tumbler (不锈钢保温杯),厨房用品,产品经理甲,70.0,17.5,2025-10-01,Active
+DE01,KT-003-DE,KT-003,B048JRJAP6,B0NVY9FKTG,Electric Hand Mixer (电动打蛋器),厨房用品,产品经理甲,104.0,22.5,2026-01-10,Active
+DE01,OD-001-DE,OD-001,B06T2YLXX1,B0C8NW4132,Rechargeable Camping Lantern (户外露营灯),户外运动,产品经理乙,82.0,20.0,2026-01-10,Active
+DE01,OD-002-DE,OD-002,B0YEMKRR6W,B0G06ASJRR,Folding Camping Chair (折叠露营椅),户外运动,产品经理乙,170.0,55.0,2026-02-01,Active
+DE01,OD-003-DE,OD-003,B00W7NFD8K,B0H95EQ5RC,Sports Water Bottle (运动水壶),户外运动,产品经理乙,32.0,7.5,2026-02-01,Active
+DE01,PT-001-DE,PT-001,B0ZAXMLUF7,B0BKXQFF8U,Automatic Pet Feeder (宠物自动喂食器),宠物用品,产品经理乙,140.0,30.0,2026-02-15,Active
+DE01,PT-002-DE,PT-002,B0JWS74CNP,B0VH678FX7,Dog Leash (宠物牵引绳),宠物用品,产品经理乙,28.0,7.5,2026-02-15,Active
+DE01,PT-003-DE,PT-003,B0U6HPP0TC,B0EAEV7VE3,Cat Scratching Board (猫抓板),宠物用品,产品经理乙,40.0,12.5,2025-12-01,Active
+DE01,PT-004-DE,PT-004,B0MDU41FQ3,B07FCFLVVH,Pet Grooming Brush (宠物梳),宠物用品,产品经理乙,24.0,7.5,2025-09-01,Inactive

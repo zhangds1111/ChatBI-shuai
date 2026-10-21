@@ -5,14 +5,22 @@ Query 拆解器模块
 """
 
 import json
+from datetime import date
 from pathlib import Path
 import re
 from typing import Callable
 
 from pydantic import BaseModel, Field, ValidationError
 
+from knowledge.analysis_dimensions import (
+    AVAILABLE_DIMENSIONS,
+    build_dimension_catalog_text,
+    build_strategy_text,
+    normalize_dimensions,
+)
 from llm_client import LLMClient
 from prompt_builder import SCHEMA
+from tracing import traceable
 
 
 class DecomposedTask(BaseModel):
@@ -35,23 +43,6 @@ class DecompositionPlan(BaseModel):
     subtasks: list[DecomposedTask]
 
 
-AVAILABLE_DIMENSIONS = [
-    "月份",
-    "客户",
-    "客户类型",
-    "行业",
-    "国家",
-    "区域",
-    "产品",
-    "产品线",
-    "品类", # 品种类型 category
-    "技术路线",
-    "部门",
-    "费用项目",
-    "原因类型",
-]
-
-
 def _load_indicator_catalog() -> list[str]:
     config_path = Path(__file__).with_name("indicators_full.json")
     with config_path.open("r", encoding="utf-8") as file:
@@ -67,9 +58,9 @@ def _load_indicator_catalog() -> list[str]:
 def _max_tasks_for_question_type(question_type: str) -> int:
     normalized = question_type.lower()
     if "trend" in normalized or "趋势" in question_type:
-        return 6
+        return 7
     if "diagnosis" in normalized or "原因" in question_type or "下降" in question_type:
-        return 6
+        return 7
     if "dimension" in normalized or "维度" in question_type:
         return 5
     return 8
@@ -78,7 +69,7 @@ def _max_tasks_for_question_type(question_type: str) -> int:
 def build_decomposition_prompt(user_question: str) -> tuple[str, str]:
     """构造 Query 拆解 Prompt。"""
     indicator_catalog = "、".join(_load_indicator_catalog())
-    dimension_catalog = "、".join(AVAILABLE_DIMENSIONS)
+    dimension_catalog = build_dimension_catalog_text()
     system_msg = (
         "你是企业级 ChatBI 系统中的任务拆解器。"
         "请把复杂分析问题拆成可执行的子任务列表，"
@@ -87,6 +78,11 @@ def build_decomposition_prompt(user_question: str) -> tuple[str, str]:
     prompt = f"""
 【数据库 Schema】
 {SCHEMA}
+
+【当前日期】
+今天是 {date.today().isoformat()}。年份推断规则：问题中不带年份的月份（如「9月」「8月」）指以当前日期为基准，
+最近一个已经过完（或正在经历）的该月份。拆解子任务时，必须把「9月」「上个月」等相对时间解析为明确的年月
+（如 2026 年 9 月），写进子任务的 task_name 和 description，不要让下游执行时再猜年份。
 
 【可用分析维度】
 {dimension_catalog}
@@ -116,10 +112,7 @@ def build_decomposition_prompt(user_question: str) -> tuple[str, str]:
 8. 指标优先复用【可用指标】中的名称或别名
 9. 如果一个任务同时要求多个维度或多个驱动因素，请拆成多个更简单的子任务
 
-【常见分析类型拆解策略】
-1. 趋势分析：优先拆成“主指标趋势 + 关键驱动项趋势 + 异常月份定位 + 原因归纳”，通常不超过 6 个子任务
-2. 原因诊断：优先拆成“结果趋势 + 构成拆解 + 关键维度定位 + 必要专项分析 + 结论汇总”，通常不超过 6 个子任务
-3. 维度对比：优先拆成“核心维度排名/贡献 + 必要补充维度 + 结论汇总”，通常不超过 5 个子任务
+{build_strategy_text()}
 """.strip()
     return system_msg, prompt
 
@@ -135,6 +128,7 @@ class QueryDecomposer:
         self.llm = llm_client or LLMClient()
         self.response_generator = response_generator or self._generate_response
 
+    @traceable(name="任务拆解", run_type="chain")
     def decompose(self, user_question: str) -> dict:
         """将复杂问题拆解为结构化子任务。"""
         question = user_question.strip()
@@ -152,6 +146,9 @@ class QueryDecomposer:
 
             try:
                 self._validate_dependencies(plan)
+                # 近义词归一（国家→站点、商品→ASIN 等）后再做支持性校验
+                for task in plan.subtasks:
+                    task.dimensions = normalize_dimensions(task.dimensions)
                 self._validate_dimensions(plan)
                 self._validate_plan_complexity(plan)
                 return plan.model_dump()

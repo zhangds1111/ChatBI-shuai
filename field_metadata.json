@@ -1,0 +1,776 @@
+{
+  "dim_stores.store_id": {
+    "table": "dim_stores",
+    "field": "store_id",
+    "type": "VARCHAR(32)",
+    "comment": "店铺站点ID",
+    "description": "店铺站点ID,VARCHAR(32)。店铺站点唯一标识(主键),示例:US01、CA01、UK01、DE01。各事实表通过它关联店铺。",
+    "domain": "维度表",
+    "is_primary_key": true
+  },
+  "dim_stores.store_name": {
+    "table": "dim_stores",
+    "field": "store_name",
+    "type": "VARCHAR(100)",
+    "comment": "店铺名称",
+    "description": "店铺名称,VARCHAR(100)。店铺名称。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "dim_stores.marketplace": {
+    "table": "dim_stores",
+    "field": "marketplace",
+    "type": "VARCHAR(8)",
+    "comment": "站点",
+    "description": "站点,VARCHAR(8)。亚马逊站点代码。枚举值:US / CA / UK / DE。按站点、国家分析时使用此字段(没有单独的 country 字段)。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "dim_stores.currency": {
+    "table": "dim_stores",
+    "field": "currency",
+    "type": "VARCHAR(8)",
+    "comment": "站点币种",
+    "description": "站点币种,VARCHAR(8)。站点币种。枚举值:USD / CAD / GBP / EUR。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "dim_stores.timezone": {
+    "table": "dim_stores",
+    "field": "timezone",
+    "type": "VARCHAR(40)",
+    "comment": "站点时区",
+    "description": "站点时区,VARCHAR(40)。站点时区。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "dim_stores.owner": {
+    "table": "dim_stores",
+    "field": "owner",
+    "type": "VARCHAR(50)",
+    "comment": "运营负责人",
+    "description": "运营负责人,VARCHAR(50)。运营负责人。枚举值:运营A / 运营B。用于按人或按团队的权限过滤。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "dim_products.store_id": {
+    "table": "dim_products",
+    "field": "store_id",
+    "type": "VARCHAR(32)",
+    "comment": "店铺站点ID",
+    "description": "店铺站点ID,VARCHAR(32)。店铺站点ID,与 msku 组成联合主键,关联 dim_stores.store_id。",
+    "domain": "维度表",
+    "is_primary_key": true
+  },
+  "dim_products.msku": {
+    "table": "dim_products",
+    "field": "msku",
+    "type": "VARCHAR(64)",
+    "comment": "MSKU",
+    "description": "MSKU,VARCHAR(64)。商家自定义 SKU(店铺×站点维度),联合主键之一。一个 ASIN 可对应多个 MSKU。",
+    "domain": "维度表",
+    "is_primary_key": true
+  },
+  "dim_products.sku": {
+    "table": "dim_products",
+    "field": "sku",
+    "type": "VARCHAR(64)",
+    "comment": "内部SKU",
+    "description": "内部SKU,VARCHAR(64)。内部 SKU,跨站点相同,示例:HS-001。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "dim_products.asin": {
+    "table": "dim_products",
+    "field": "asin",
+    "type": "VARCHAR(16)",
+    "comment": "ASIN",
+    "description": "ASIN,VARCHAR(16)。亚马逊商品编号。ASIN 与 MSKU 是一对多关系,按 ASIN 关联 dim_products 会放大数值,需先按 ASIN 去重。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "dim_products.parent_asin": {
+    "table": "dim_products",
+    "field": "parent_asin",
+    "type": "VARCHAR(16)",
+    "comment": "父ASIN",
+    "description": "父ASIN,VARCHAR(16)。父 ASIN,用于变体汇总。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "dim_products.product_name": {
+    "table": "dim_products",
+    "field": "product_name",
+    "type": "VARCHAR(200)",
+    "comment": "商品名称",
+    "description": "商品名称,VARCHAR(200)。商品名称,中英文混合,示例:Foldable Storage Bin (折叠收纳箱)。用于查询特定商品。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "dim_products.category": {
+    "table": "dim_products",
+    "field": "category",
+    "type": "VARCHAR(64)",
+    "comment": "品类",
+    "description": "品类,VARCHAR(64)。商品品类。枚举值:厨房用品 / 宠物用品 / 家居收纳 / 家居照明 / 户外运动。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "dim_products.owner": {
+    "table": "dim_products",
+    "field": "owner",
+    "type": "VARCHAR(50)",
+    "comment": "产品负责人",
+    "description": "产品负责人,VARCHAR(50)。产品负责人。枚举值:产品经理甲 / 产品经理乙。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "dim_products.unit_cost": {
+    "table": "dim_products",
+    "field": "unit_cost",
+    "type": "DECIMAL(12,4)",
+    "comment": "单件采购成本(CNY)",
+    "description": "单件采购成本(CNY),DECIMAL(12,4)。单件采购成本,人民币。商品成本 = (unit_cost + head_freight_cost) × 销量。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "dim_products.head_freight_cost": {
+    "table": "dim_products",
+    "field": "head_freight_cost",
+    "type": "DECIMAL(12,4)",
+    "comment": "单件头程运费(CNY)",
+    "description": "单件头程运费(CNY),DECIMAL(12,4)。单件头程运费,人民币。计入商品成本。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "dim_products.launch_date": {
+    "table": "dim_products",
+    "field": "launch_date",
+    "type": "DATE",
+    "comment": "上架日期",
+    "description": "上架日期,DATE。上架日期,用于新品分析。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "dim_products.status": {
+    "table": "dim_products",
+    "field": "status",
+    "type": "VARCHAR(16)",
+    "comment": "商品状态",
+    "description": "商品状态,VARCHAR(16)。商品状态。枚举值:Active 在售 / Inactive 停售。",
+    "domain": "维度表",
+    "is_primary_key": false
+  },
+  "exchange_rates.rate_date": {
+    "table": "exchange_rates",
+    "field": "rate_date",
+    "type": "DATE",
+    "comment": "汇率日期",
+    "description": "汇率日期,DATE。汇率日期,与 currency 组成联合主键。按订单下单日期关联。",
+    "domain": "参考表",
+    "is_primary_key": true
+  },
+  "exchange_rates.currency": {
+    "table": "exchange_rates",
+    "field": "currency",
+    "type": "VARCHAR(8)",
+    "comment": "币种",
+    "description": "币种,VARCHAR(8)。币种,枚举值:USD / CAD / GBP / EUR。",
+    "domain": "参考表",
+    "is_primary_key": true
+  },
+  "exchange_rates.rate_to_cny": {
+    "table": "exchange_rates",
+    "field": "rate_to_cny",
+    "type": "DECIMAL(12,6)",
+    "comment": "兑人民币汇率",
+    "description": "兑人民币汇率,DECIMAL(12,6)。兑人民币汇率,1 单位原币 = rate_to_cny 元人民币。原币金额 × rate_to_cny = 人民币金额。",
+    "domain": "参考表",
+    "is_primary_key": false
+  },
+  "amz_order_items.order_id": {
+    "table": "amz_order_items",
+    "field": "order_id",
+    "type": "VARCHAR(32)",
+    "comment": "订单号",
+    "description": "订单号,VARCHAR(32)。亚马逊订单号,同一订单可含多个商品行。订单量必须用 COUNT(DISTINCT order_id),不能 COUNT(*)。",
+    "domain": "事实表",
+    "is_primary_key": true
+  },
+  "amz_order_items.order_item_id": {
+    "table": "amz_order_items",
+    "field": "order_item_id",
+    "type": "VARCHAR(32)",
+    "comment": "订单商品行ID",
+    "description": "订单商品行ID,VARCHAR(32)。订单商品行ID,与 order_id 组成联合主键。",
+    "domain": "事实表",
+    "is_primary_key": true
+  },
+  "amz_order_items.store_id": {
+    "table": "amz_order_items",
+    "field": "store_id",
+    "type": "VARCHAR(32)",
+    "comment": "店铺站点ID",
+    "description": "店铺站点ID,VARCHAR(32)。店铺站点ID,关联 dim_stores.store_id。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_order_items.msku": {
+    "table": "amz_order_items",
+    "field": "msku",
+    "type": "VARCHAR(64)",
+    "comment": "MSKU",
+    "description": "MSKU,VARCHAR(64)。MSKU,与 store_id 一起关联 dim_products 获取成本、品类。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_order_items.asin": {
+    "table": "amz_order_items",
+    "field": "asin",
+    "type": "VARCHAR(16)",
+    "comment": "ASIN",
+    "description": "ASIN,VARCHAR(16)。ASIN,按商品汇总销售时使用。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_order_items.purchase_date": {
+    "table": "amz_order_items",
+    "field": "purchase_date",
+    "type": "DATE",
+    "comment": "下单日期",
+    "description": "下单日期,DATE。下单日期,订单类指标的时间字段。问「上个月销售额」「本周订单」都以此字段过滤。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_order_items.order_status": {
+    "table": "amz_order_items",
+    "field": "order_status",
+    "type": "VARCHAR(20)",
+    "comment": "订单状态",
+    "description": "订单状态,VARCHAR(20)。订单状态。枚举值:Shipped 已发货 / Unshipped 未发货 / Pending 待处理 / Canceled 已取消。销售额、订单量、销量统计必须排除 Canceled 和 Pending。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_order_items.quantity": {
+    "table": "amz_order_items",
+    "field": "quantity",
+    "type": "INT",
+    "comment": "件数",
+    "description": "件数,INT。本商品行的件数,销量 = SUM(quantity)。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_order_items.item_amount": {
+    "table": "amz_order_items",
+    "field": "item_amount",
+    "type": "DECIMAL(14,2)",
+    "comment": "商品销售额(原币,不含税)",
+    "description": "商品销售额(原币,不含税),DECIMAL(14,2)。商品销售额,站点原币,不含税。销售额口径用此字段;汇总到人民币需 × exchange_rates.rate_to_cny。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_order_items.tax_amount": {
+    "table": "amz_order_items",
+    "field": "tax_amount",
+    "type": "DECIMAL(14,2)",
+    "comment": "税额(原币)",
+    "description": "税额(原币),DECIMAL(14,2)。税额,原币。不计入销售额。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_order_items.shipping_amount": {
+    "table": "amz_order_items",
+    "field": "shipping_amount",
+    "type": "DECIMAL(14,2)",
+    "comment": "运费收入(原币)",
+    "description": "运费收入(原币),DECIMAL(14,2)。运费收入,原币。默认不计入销售额,除非问题明确要求含运费。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_order_items.promotion_amount": {
+    "table": "amz_order_items",
+    "field": "promotion_amount",
+    "type": "DECIMAL(14,2)",
+    "comment": "促销折扣(原币)",
+    "description": "促销折扣(原币),DECIMAL(14,2)。促销折扣金额,原币。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_order_items.currency": {
+    "table": "amz_order_items",
+    "field": "currency",
+    "type": "VARCHAR(8)",
+    "comment": "币种",
+    "description": "币种,VARCHAR(8)。订单币种,与 exchange_rates.currency 一起折算人民币。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_ads_daily.report_date": {
+    "table": "amz_ads_daily",
+    "field": "report_date",
+    "type": "DATE",
+    "comment": "报告日期",
+    "description": "报告日期,DATE。广告报告日期,广告指标的时间字段。",
+    "domain": "事实表",
+    "is_primary_key": true
+  },
+  "amz_ads_daily.store_id": {
+    "table": "amz_ads_daily",
+    "field": "store_id",
+    "type": "VARCHAR(32)",
+    "comment": "店铺站点ID",
+    "description": "店铺站点ID,VARCHAR(32)。店铺站点ID。",
+    "domain": "事实表",
+    "is_primary_key": true
+  },
+  "amz_ads_daily.ad_type": {
+    "table": "amz_ads_daily",
+    "field": "ad_type",
+    "type": "VARCHAR(8)",
+    "comment": "广告类型",
+    "description": "广告类型,VARCHAR(8)。广告类型。枚举值:SP(商品推广)/ SB(品牌推广)。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_ads_daily.campaign_id": {
+    "table": "amz_ads_daily",
+    "field": "campaign_id",
+    "type": "VARCHAR(32)",
+    "comment": "广告活动ID",
+    "description": "广告活动ID,VARCHAR(32)。广告活动ID。",
+    "domain": "事实表",
+    "is_primary_key": true
+  },
+  "amz_ads_daily.campaign_name": {
+    "table": "amz_ads_daily",
+    "field": "campaign_name",
+    "type": "VARCHAR(200)",
+    "comment": "广告活动名称",
+    "description": "广告活动名称,VARCHAR(200)。广告活动名称,示例:US_SP_Auto_HS-001(站点_类型_投放方式_SKU)。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_ads_daily.asin": {
+    "table": "amz_ads_daily",
+    "field": "asin",
+    "type": "VARCHAR(16)",
+    "comment": "被推广ASIN",
+    "description": "被推广ASIN,VARCHAR(16)。被推广 ASIN。",
+    "domain": "事实表",
+    "is_primary_key": true
+  },
+  "amz_ads_daily.msku": {
+    "table": "amz_ads_daily",
+    "field": "msku",
+    "type": "VARCHAR(64)",
+    "comment": "被推广MSKU",
+    "description": "被推广MSKU,VARCHAR(64)。被推广 MSKU。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_ads_daily.impressions": {
+    "table": "amz_ads_daily",
+    "field": "impressions",
+    "type": "BIGINT",
+    "comment": "曝光量",
+    "description": "曝光量,BIGINT。广告曝光量。点击率 = 点击 ÷ 曝光。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_ads_daily.clicks": {
+    "table": "amz_ads_daily",
+    "field": "clicks",
+    "type": "BIGINT",
+    "comment": "点击量",
+    "description": "点击量,BIGINT。广告点击量。CPC = 花费 ÷ 点击。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_ads_daily.spend": {
+    "table": "amz_ads_daily",
+    "field": "spend",
+    "type": "DECIMAL(14,2)",
+    "comment": "广告花费(原币)",
+    "description": "广告花费(原币),DECIMAL(14,2)。广告花费,原币。汇总人民币需 × 汇率。以此表为准,不要再加结算表中的广告扣费。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_ads_daily.sales_7d": {
+    "table": "amz_ads_daily",
+    "field": "sales_7d",
+    "type": "DECIMAL(14,2)",
+    "comment": "7天归因广告销售额(原币)",
+    "description": "7天归因广告销售额(原币),DECIMAL(14,2)。7 天归因广告销售额,原币。ACOS = spend ÷ sales_7d。注意是归因销售额,不是店铺总销售额。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_ads_daily.orders_7d": {
+    "table": "amz_ads_daily",
+    "field": "orders_7d",
+    "type": "INT",
+    "comment": "7天归因广告订单数",
+    "description": "7天归因广告订单数,INT。7 天归因广告订单数。广告转化率 = orders_7d ÷ clicks。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_ads_daily.units_7d": {
+    "table": "amz_ads_daily",
+    "field": "units_7d",
+    "type": "INT",
+    "comment": "7天归因广告销量",
+    "description": "7天归因广告销量,INT。7 天归因广告销量。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_ads_daily.currency": {
+    "table": "amz_ads_daily",
+    "field": "currency",
+    "type": "VARCHAR(8)",
+    "comment": "币种",
+    "description": "币种,VARCHAR(8)。币种。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_traffic_daily.report_date": {
+    "table": "amz_traffic_daily",
+    "field": "report_date",
+    "type": "DATE",
+    "comment": "报告日期",
+    "description": "报告日期,DATE。流量报告日期,流量类指标的时间字段。",
+    "domain": "事实表",
+    "is_primary_key": true
+  },
+  "amz_traffic_daily.store_id": {
+    "table": "amz_traffic_daily",
+    "field": "store_id",
+    "type": "VARCHAR(32)",
+    "comment": "店铺站点ID",
+    "description": "店铺站点ID,VARCHAR(32)。店铺站点ID。",
+    "domain": "事实表",
+    "is_primary_key": true
+  },
+  "amz_traffic_daily.asin": {
+    "table": "amz_traffic_daily",
+    "field": "asin",
+    "type": "VARCHAR(16)",
+    "comment": "ASIN",
+    "description": "ASIN,VARCHAR(16)。ASIN,流量粒度为日期×ASIN。",
+    "domain": "事实表",
+    "is_primary_key": true
+  },
+  "amz_traffic_daily.sessions": {
+    "table": "amz_traffic_daily",
+    "field": "sessions",
+    "type": "INT",
+    "comment": "会话数",
+    "description": "会话数,INT。会话数(访问量)。转化率 = units_ordered ÷ sessions。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_traffic_daily.page_views": {
+    "table": "amz_traffic_daily",
+    "field": "page_views",
+    "type": "INT",
+    "comment": "页面浏览量",
+    "description": "页面浏览量,INT。页面浏览量,大于等于会话数。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_traffic_daily.units_ordered": {
+    "table": "amz_traffic_daily",
+    "field": "units_ordered",
+    "type": "INT",
+    "comment": "下单件数",
+    "description": "下单件数,INT。下单件数,用于计算转化率(Unit Session Percentage)。不要用订单表销量除以会话数。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_traffic_daily.buy_box_pct": {
+    "table": "amz_traffic_daily",
+    "field": "buy_box_pct",
+    "type": "DECIMAL(6,2)",
+    "comment": "Buy Box占比(%)",
+    "description": "Buy Box占比(%),DECIMAL(6,2)。Buy Box(黄金购物车)占比,0-100 的百分数。汇总必须按 sessions 加权,不能直接 AVG。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_traffic_daily.ordered_sales": {
+    "table": "amz_traffic_daily",
+    "field": "ordered_sales",
+    "type": "DECIMAL(14,2)",
+    "comment": "下单销售额(原币)",
+    "description": "下单销售额(原币),DECIMAL(14,2)。下单销售额,原币,来自流量报告,不等于订单表销售额。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_fba_inventory.snapshot_date": {
+    "table": "amz_fba_inventory",
+    "field": "snapshot_date",
+    "type": "DATE",
+    "comment": "快照日期",
+    "description": "快照日期,DATE。库存快照日期。库存是快照数据,不能跨天相加;查当前库存取最新 snapshot_date。",
+    "domain": "事实表",
+    "is_primary_key": true
+  },
+  "amz_fba_inventory.store_id": {
+    "table": "amz_fba_inventory",
+    "field": "store_id",
+    "type": "VARCHAR(32)",
+    "comment": "店铺站点ID",
+    "description": "店铺站点ID,VARCHAR(32)。店铺站点ID。",
+    "domain": "事实表",
+    "is_primary_key": true
+  },
+  "amz_fba_inventory.msku": {
+    "table": "amz_fba_inventory",
+    "field": "msku",
+    "type": "VARCHAR(64)",
+    "comment": "MSKU",
+    "description": "MSKU,VARCHAR(64)。MSKU,库存粒度为快照日期×MSKU。",
+    "domain": "事实表",
+    "is_primary_key": true
+  },
+  "amz_fba_inventory.asin": {
+    "table": "amz_fba_inventory",
+    "field": "asin",
+    "type": "VARCHAR(16)",
+    "comment": "ASIN",
+    "description": "ASIN,VARCHAR(16)。ASIN。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_fba_inventory.available_qty": {
+    "table": "amz_fba_inventory",
+    "field": "available_qty",
+    "type": "INT",
+    "comment": "可售库存",
+    "description": "可售库存,INT。FBA 可售库存件数。可售天数 = available_qty ÷ 日均销量。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_fba_inventory.inbound_qty": {
+    "table": "amz_fba_inventory",
+    "field": "inbound_qty",
+    "type": "INT",
+    "comment": "在途库存",
+    "description": "在途库存,INT。在途库存件数(已发往亚马逊仓,尚未入库)。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_fba_inventory.reserved_qty": {
+    "table": "amz_fba_inventory",
+    "field": "reserved_qty",
+    "type": "INT",
+    "comment": "预留库存",
+    "description": "预留库存,INT。预留库存件数(订单处理或转仓中)。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_fba_inventory.age_0_90_qty": {
+    "table": "amz_fba_inventory",
+    "field": "age_0_90_qty",
+    "type": "INT",
+    "comment": "库龄0-90天件数",
+    "description": "库龄0-90天件数,INT。库龄 0-90 天件数。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_fba_inventory.age_91_180_qty": {
+    "table": "amz_fba_inventory",
+    "field": "age_91_180_qty",
+    "type": "INT",
+    "comment": "库龄91-180天件数",
+    "description": "库龄91-180天件数,INT。库龄 91-180 天件数。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_fba_inventory.age_181_270_qty": {
+    "table": "amz_fba_inventory",
+    "field": "age_181_270_qty",
+    "type": "INT",
+    "comment": "库龄181-270天件数",
+    "description": "库龄181-270天件数,INT。库龄 181-270 天件数。高库龄 = 181 天以上,即 181-270、271-365、365 天以上三段之和。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_fba_inventory.age_271_365_qty": {
+    "table": "amz_fba_inventory",
+    "field": "age_271_365_qty",
+    "type": "INT",
+    "comment": "库龄271-365天件数",
+    "description": "库龄271-365天件数,INT。库龄 271-365 天件数,属于高库龄。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_fba_inventory.age_365_plus_qty": {
+    "table": "amz_fba_inventory",
+    "field": "age_365_plus_qty",
+    "type": "INT",
+    "comment": "库龄365天以上件数",
+    "description": "库龄365天以上件数,INT。库龄 365 天以上件数,属于高库龄,长期仓储费风险最大。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_settlement.id": {
+    "table": "amz_settlement",
+    "field": "id",
+    "type": "BIGINT",
+    "comment": "自增主键(仅模拟库使用)",
+    "description": "自增主键(仅模拟库使用),BIGINT。自增主键(仅模拟库使用),无业务含义,不用于查询。",
+    "domain": "事实表",
+    "is_primary_key": true
+  },
+  "amz_settlement.settlement_id": {
+    "table": "amz_settlement",
+    "field": "settlement_id",
+    "type": "VARCHAR(32)",
+    "comment": "结算批次ID",
+    "description": "结算批次ID,VARCHAR(32)。结算批次ID。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_settlement.posted_date": {
+    "table": "amz_settlement",
+    "field": "posted_date",
+    "type": "DATE",
+    "comment": "入账日期",
+    "description": "入账日期,DATE。入账日期,结算类指标的时间字段。与下单日期不同期。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_settlement.store_id": {
+    "table": "amz_settlement",
+    "field": "store_id",
+    "type": "VARCHAR(32)",
+    "comment": "店铺站点ID",
+    "description": "店铺站点ID,VARCHAR(32)。店铺站点ID。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_settlement.order_id": {
+    "table": "amz_settlement",
+    "field": "order_id",
+    "type": "VARCHAR(32)",
+    "comment": "订单号",
+    "description": "订单号,VARCHAR(32)。订单号,可关联订单明细。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_settlement.msku": {
+    "table": "amz_settlement",
+    "field": "msku",
+    "type": "VARCHAR(64)",
+    "comment": "MSKU",
+    "description": "MSKU,VARCHAR(64)。MSKU,可为空(如店铺级仓储费),关联商品时需用 LEFT JOIN。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_settlement.fee_type": {
+    "table": "amz_settlement",
+    "field": "fee_type",
+    "type": "VARCHAR(24)",
+    "comment": "费用类型",
+    "description": "费用类型,VARCHAR(24)。结算费用类型。枚举值:principal 货款(正)/ commission 销售佣金(负)/ fba_fee FBA配送费(负)/ storage_fee 仓储费(负)/ promotion 促销(负)/ refund 退款(负)/ other 其他。平台费用 = commission + fba_fee + storage_fee 的相反数;回款额 = 全部 amount 之和。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_settlement.amount": {
+    "table": "amz_settlement",
+    "field": "amount",
+    "type": "DECIMAL(14,2)",
+    "comment": "金额(原币)",
+    "description": "金额(原币),DECIMAL(14,2)。结算金额,原币。收入为正,费用/退款为负。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_settlement.currency": {
+    "table": "amz_settlement",
+    "field": "currency",
+    "type": "VARCHAR(8)",
+    "comment": "币种",
+    "description": "币种,VARCHAR(8)。币种。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_returns.id": {
+    "table": "amz_returns",
+    "field": "id",
+    "type": "BIGINT",
+    "comment": "自增主键(仅模拟库使用)",
+    "description": "自增主键(仅模拟库使用),BIGINT。自增主键(仅模拟库使用),无业务含义,不用于查询。",
+    "domain": "事实表",
+    "is_primary_key": true
+  },
+  "amz_returns.return_date": {
+    "table": "amz_returns",
+    "field": "return_date",
+    "type": "DATE",
+    "comment": "退货日期",
+    "description": "退货日期,DATE。退货日期,退货类指标的时间字段。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_returns.store_id": {
+    "table": "amz_returns",
+    "field": "store_id",
+    "type": "VARCHAR(32)",
+    "comment": "店铺站点ID",
+    "description": "店铺站点ID,VARCHAR(32)。店铺站点ID。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_returns.order_id": {
+    "table": "amz_returns",
+    "field": "order_id",
+    "type": "VARCHAR(32)",
+    "comment": "原订单号",
+    "description": "原订单号,VARCHAR(32)。原订单号。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_returns.msku": {
+    "table": "amz_returns",
+    "field": "msku",
+    "type": "VARCHAR(64)",
+    "comment": "MSKU",
+    "description": "MSKU,VARCHAR(64)。MSKU。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_returns.asin": {
+    "table": "amz_returns",
+    "field": "asin",
+    "type": "VARCHAR(16)",
+    "comment": "ASIN",
+    "description": "ASIN,VARCHAR(16)。ASIN。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_returns.quantity": {
+    "table": "amz_returns",
+    "field": "quantity",
+    "type": "INT",
+    "comment": "退货件数",
+    "description": "退货件数,INT。退货件数。退货率 = 退货件数 ÷ 销量。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_returns.reason": {
+    "table": "amz_returns",
+    "field": "reason",
+    "type": "VARCHAR(100)",
+    "comment": "退货原因",
+    "description": "退货原因,VARCHAR(100)。退货原因。枚举值:DEFECTIVE 瑕疵 / NOT_AS_DESCRIBED 与描述不符 / NO_LONGER_NEEDED 不再需要 / NO_REASON_GIVEN 未说明 / QUALITY_UNACCEPTABLE 质量不满意 / TOO_SMALL 尺寸偏小 / WRONG_ITEM 发错货。",
+    "domain": "事实表",
+    "is_primary_key": false
+  },
+  "amz_returns.disposition": {
+    "table": "amz_returns",
+    "field": "disposition",
+    "type": "VARCHAR(30)",
+    "comment": "处置结果",
+    "description": "处置结果,VARCHAR(30)。处置结果。枚举值:SELLABLE 可再售 / DAMAGED 损坏 / CUSTOMER_DAMAGED 客户损坏 / DEFECTIVE 瑕疵。",
+    "domain": "事实表",
+    "is_primary_key": false
+  }
+}

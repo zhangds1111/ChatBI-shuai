@@ -18,6 +18,7 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from config import LLM_CONFIG
+from tracing import traceable, wrap_embeddings
 
 
 # ==================== 配置 ====================
@@ -36,11 +37,15 @@ def _cosine_relevance_score_fn(distance: float) -> float:
 
 def get_embeddings() -> OpenAIEmbeddings:
     """构建 LangChain OpenAI Embeddings 实例（复用第 15 课配置）"""
-    return OpenAIEmbeddings(
+    return wrap_embeddings(OpenAIEmbeddings(
         model=LLM_CONFIG["embedding_model"],
         base_url=LLM_CONFIG["base_url"],
         api_key=LLM_CONFIG["api_key"],
-    )
+        # 本地 MaaS 兼容接口只接受字符串数组，不做 tiktoken 预切分，
+        # 且单批最多 25 条
+        check_embedding_ctx_length=False,
+        chunk_size=25,
+    ))
 
 
 def get_vectorstore() -> Chroma:
@@ -235,6 +240,7 @@ def build_indicator_knowledge_block(query: str) -> str:
     return build_indicator_knowledge_block_from_results(indicators)
 
 
+@traceable(name="指标语义检索", run_type="retriever")
 def retrieve_indicator_context(
     query: str,
     top_k: int = 3,

@@ -12,21 +12,25 @@ import re
 from typing import Generator
 from openai import OpenAI
 from config import LLM_CONFIG
+from tracing import reduce_joined, traceable, wrap_openai_client
 
 
 class LLMClient:
     """LLM API 客户端"""
 
     def __init__(self):
-        self.client = OpenAI(
-            api_key=LLM_CONFIG["api_key"],
-            base_url=LLM_CONFIG["base_url"]
+        self.client = wrap_openai_client(
+            OpenAI(
+                api_key=LLM_CONFIG["api_key"],
+                base_url=LLM_CONFIG["base_url"]
+            )
         )
         self.model = LLM_CONFIG["model"]
         self.embedding_model = LLM_CONFIG["embedding_model"]
         self.temperature = LLM_CONFIG["temperature"]
         self.max_tokens = LLM_CONFIG["max_tokens"]
 
+    @traceable(name="SQL生成", run_type="chain")
     def generate_sql(self, system_msg: str, prompt: str) -> str:
         """
         调用 LLM 生成 SQL（同步，一次性返回）
@@ -45,6 +49,7 @@ class LLMClient:
 
         return sql
 
+    @traceable(name="文本生成", run_type="chain")
     def generate_text(self, system_msg: str, prompt: str) -> str:
         """
         调用 LLM 生成普通文本（同步，一次性返回）
@@ -67,6 +72,7 @@ class LLMClient:
         )
         return response.choices[0].message.content.strip()
 
+    @traceable(name="SQL流式生成", run_type="chain", reduce_fn=reduce_joined)
     def generate_sql_stream(self, system_msg: str, prompt: str) -> Generator[str, None, None]:
         """
         调用 LLM 流式生成 SQL（逐 chunk 产出）
@@ -100,6 +106,7 @@ class LLMClient:
             if delta_content is not None:
                 yield delta_content
 
+    @traceable(name="文本向量化", run_type="embedding")
     def get_embedding(self, text: str) -> list[float]:
         """
         调用 Embedding API 将文本转为向量

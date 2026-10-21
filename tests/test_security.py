@@ -7,15 +7,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from main import ChatBISystem
 from database import DatabaseClient
-from security import QuerySecurityManager, SecurityError, UserContext
+from security import QuerySecurityManager, SecurityError, StoreDirectory, UserContext
 
 
 class FakeCursor:
     def __init__(self):
         self.description = [
-            ("customer_name",),
+            ("product_name",),
             ("customer_phone",),
-            ("net_amount",),
+            ("customer_email",),
         ]
         self.executed_sql = ""
 
@@ -28,8 +28,11 @@ class FakeCursor:
     def execute(self, sql: str):
         self.executed_sql = sql
 
+    def fetchmany(self, size: int):
+        return [("折叠收纳箱", "13800000000", "a@b.com")]
+
     def fetchall(self):
-        return [("宁德时代", "13800001111", 1250000)]
+        return [("折叠收纳箱", "13800000000", "a@b.com")]
 
 
 class FakeConnection:
@@ -44,63 +47,93 @@ class FakeConnection:
         self.closed = True
 
 
+def _manager() -> QuerySecurityManager:
+    directory = StoreDirectory()
+    directory.prime({"运营A": ["US01", "CA01"], "运营B": ["UK01", "DE01"]})
+    return QuerySecurityManager(store_directory=directory)
+
+
 def test_security_manager_rejects_non_select_sql():
-    manager = QuerySecurityManager()
+    manager = _manager()
     user = UserContext(user_id="u_admin", role="admin")
 
-    with pytest.raises(SecurityError, match="只允许执行查询语句"):
-        manager.secure_sql("DELETE FROM sales_orders", user)
+    with pytest.raises(SecurityError, match="只允许执行 SELECT 查询"):
+        manager.secure_sql("DELETE FROM amz_order_items", user)
 
 
-def test_security_manager_injects_region_filter_for_sales_role():
-    manager = QuerySecurityManager()
-    user = UserContext(user_id="u_sales_east", role="sales", region="华东大区")
+def test_security_manager_rejects_unknown_role_instead_of_admin_fallback():
+    manager = _manager()
+    user = UserContext(user_id="u_hacker", role="hacker")
+
+    with pytest.raises(SecurityError, match="未知角色"):
+        manager.secure_sql("SELECT * FROM amz_order_items", user)
+
+
+def test_security_manager_row_level_filter_for_ops_role():
+    manager = _manager()
+    user = UserContext(user_id="u_ops_a", role="ops", operator_name="运营A")
 
     secured_sql = manager.secure_sql(
         """
-        SELECT c.region, SUM(o.net_amount) AS revenue
-        FROM sales_orders o
-        JOIN dim_customers c ON o.customer_id = c.customer_id
-        GROUP BY c.region
+        SELECT s.marketplace, SUM(o.item_amount) AS revenue
+        FROM amz_order_items o
+        JOIN dim_stores s ON o.store_id = s.store_id
+        GROUP BY s.marketplace
         """,
         user,
     )
 
-    assert "c.region = '华东大区'" in secured_sql
-    assert secured_sql.upper().count("WHERE") == 1
+    # 每张带 store_id 的表都被包成带过滤的子查询，而不是在 SQL 末尾拼 WHERE
+    assert secured_sql.count("store_id IN ('US01', 'CA01')") == 2
+    assert secured_sql.upper().count(" WHERE ") == 2  # 仅子查询内部各一个 WHERE
 
 
-def test_security_manager_masks_sensitive_columns_for_sales_role():
-    manager = QuerySecurityManager()
-    user = UserContext(user_id="u_sales_east", role="sales", region="华东大区")
+def test_security_manager_masks_sensitive_output_columns():
+    manager = _manager()
+    user = UserContext(user_id="u_ops_a", role="ops", operator_name="运营A")
 
     masked_columns, masked_rows = manager.mask_result(
-        columns=["customer_name", "customer_phone", "net_amount"],
-        rows=[("宁德时代", "13800001111", 1250000)],
+        columns=["product_name", "customer_phone", "customer_email"],
+        rows=[("折叠收纳箱", "13800000000", "a@b.com")],
         user=user,
     )
 
-    assert masked_columns == ["customer_name", "customer_phone", "net_amount"]
-    assert masked_rows == [("宁德时代", "***", "***")]
+    assert masked_columns == ["product_name", "customer_phone", "customer_email"]
+    assert masked_rows == [("折叠收纳箱", "***", "***")]
+
+
+def test_admin_results_are_not_masked():
+    manager = _manager()
+    _, rows = manager.mask_result(
+        columns=["customer_phone"],
+        rows=[("13800000000",)],
+        user=UserContext(user_id="u_admin", role="admin"),
+    )
+    assert rows == [("13800000000",)]
 
 
 def test_database_client_applies_security_before_query_execution():
     fake_connection = FakeConnection()
-    client = DatabaseClient(connection_factory=lambda: fake_connection)
-    user = UserContext(user_id="u_sales_east", role="sales", region="华东大区")
+    manager = _manager()
+    client = DatabaseClient(
+        connection_factory=lambda: fake_connection,
+        security_manager=manager,
+    )
+    user = UserContext(user_id="u_ops_a", role="ops", operator_name="运营A")
 
     columns, rows = client.execute(
         """
-        SELECT c.customer_name, c.customer_phone, o.net_amount
-        FROM sales_orders o
-        JOIN dim_customers c ON o.customer_id = c.customer_id
+        SELECT p.product_name, p.customer_phone, p.customer_email
+        FROM dim_products p
+        JOIN dim_stores s ON p.store_id = s.store_id
         """,
         user=user,
     )
 
-    assert "c.region = '华东大区'" in fake_connection.cursor_instance.executed_sql
-    assert columns == ["customer_name", "customer_phone", "net_amount"]
-    assert rows == [("宁德时代", "***", "***")]
+    executed = fake_connection.cursor_instance.executed_sql
+    assert "store_id IN ('US01', 'CA01')" in executed
+    assert columns == ["product_name", "customer_phone", "customer_email"]
+    assert rows == [("折叠收纳箱", "***", "***")]
     assert fake_connection.closed is True
 
 
@@ -114,10 +147,10 @@ def test_chatbi_system_returns_security_error_type():
 
     class FakeLLM:
         def generate_sql(self, _system_msg: str, _prompt: str) -> str:
-            return "SELECT * FROM sales_orders"
+            return "SELECT * FROM amz_order_items"
 
     class FakeDB:
-        def execute(self, sql: str, user=None):
+        def execute(self, sql: str, user=None, **kwargs):
             raise SecurityError(f"权限不足：{user.role}")
 
     system = ChatBISystem()
@@ -127,9 +160,9 @@ def test_chatbi_system_returns_security_error_type():
 
     result = system.run(
         "查看订单明细",
-        security_context=UserContext(user_id="u_sales_east", role="sales", region="华东大区"),
+        security_context=UserContext(user_id="u_ops_b", role="ops", operator_name="运营B"),
     )
 
     assert result["success"] is False
     assert result["error_type"] == "security"
-    assert "sales" in result["error"]
+    assert "ops" in result["error"]

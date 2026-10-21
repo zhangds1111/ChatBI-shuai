@@ -1,0 +1,1515 @@
+{
+  "_comment": "适合亚马逊业务的可用分析维度。name 为规范名称(供 AVAILABLE_DIMENSIONS 使用),aliases 用于把用户/模型写的近义词归一到规范名。supported_tables 表示该维度可以用在哪些事实表上;一个任务的指标分属哪几张表,只能选这些表共同支持的维度。",
+  "dimensions": [
+    {
+      "name": "日期",
+      "aliases": [
+        "天",
+        "每日",
+        "按天"
+      ],
+      "description": "日粒度趋势",
+      "kind": "time",
+      "supported_tables": [
+        "amz_order_items",
+        "amz_ads_daily",
+        "amz_traffic_daily",
+        "amz_fba_inventory",
+        "amz_settlement",
+        "amz_returns"
+      ],
+      "values": [],
+      "note": "趋势、异常日定位",
+      "field": null,
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "f.purchase_date",
+          "join": "",
+          "distinct_values": 180,
+          "null_groups": 0
+        },
+        "amz_ads_daily": {
+          "group_expr": "f.report_date",
+          "join": "",
+          "distinct_values": 180,
+          "null_groups": 0
+        },
+        "amz_traffic_daily": {
+          "group_expr": "f.report_date",
+          "join": "",
+          "distinct_values": 180,
+          "null_groups": 0
+        },
+        "amz_fba_inventory": {
+          "group_expr": "f.snapshot_date",
+          "join": "",
+          "distinct_values": 90,
+          "null_groups": 0
+        },
+        "amz_settlement": {
+          "group_expr": "f.posted_date",
+          "join": "",
+          "distinct_values": 177,
+          "null_groups": 0
+        },
+        "amz_returns": {
+          "group_expr": "f.return_date",
+          "join": "",
+          "distinct_values": 154,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "周",
+      "aliases": [
+        "每周",
+        "按周",
+        "周度"
+      ],
+      "description": "周粒度趋势,周一为一周起点",
+      "kind": "time",
+      "supported_tables": [
+        "amz_order_items",
+        "amz_ads_daily",
+        "amz_traffic_daily",
+        "amz_fba_inventory",
+        "amz_settlement",
+        "amz_returns"
+      ],
+      "values": [],
+      "note": "取该周周一的日期作为周标签",
+      "field": null,
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "DATE_FORMAT(DATE_SUB(f.purchase_date, INTERVAL WEEKDAY(f.purchase_date) DAY), '%Y-%m-%d')",
+          "join": "",
+          "distinct_values": 26,
+          "null_groups": 0
+        },
+        "amz_ads_daily": {
+          "group_expr": "DATE_FORMAT(DATE_SUB(f.report_date, INTERVAL WEEKDAY(f.report_date) DAY), '%Y-%m-%d')",
+          "join": "",
+          "distinct_values": 26,
+          "null_groups": 0
+        },
+        "amz_traffic_daily": {
+          "group_expr": "DATE_FORMAT(DATE_SUB(f.report_date, INTERVAL WEEKDAY(f.report_date) DAY), '%Y-%m-%d')",
+          "join": "",
+          "distinct_values": 26,
+          "null_groups": 0
+        },
+        "amz_fba_inventory": {
+          "group_expr": "DATE_FORMAT(DATE_SUB(f.snapshot_date, INTERVAL WEEKDAY(f.snapshot_date) DAY), '%Y-%m-%d')",
+          "join": "",
+          "distinct_values": 13,
+          "null_groups": 0
+        },
+        "amz_settlement": {
+          "group_expr": "DATE_FORMAT(DATE_SUB(f.posted_date, INTERVAL WEEKDAY(f.posted_date) DAY), '%Y-%m-%d')",
+          "join": "",
+          "distinct_values": 26,
+          "null_groups": 0
+        },
+        "amz_returns": {
+          "group_expr": "DATE_FORMAT(DATE_SUB(f.return_date, INTERVAL WEEKDAY(f.return_date) DAY), '%Y-%m-%d')",
+          "join": "",
+          "distinct_values": 25,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "月份",
+      "aliases": [
+        "月",
+        "每月",
+        "按月",
+        "月度"
+      ],
+      "description": "月粒度趋势",
+      "kind": "time",
+      "supported_tables": [
+        "amz_order_items",
+        "amz_ads_daily",
+        "amz_traffic_daily",
+        "amz_fba_inventory",
+        "amz_settlement",
+        "amz_returns"
+      ],
+      "values": [],
+      "note": "数据区间 2026-04 至 2026-10,2026-04 与 2026-10 为不完整月份",
+      "field": null,
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "DATE_FORMAT(f.purchase_date, '%Y-%m')",
+          "join": "",
+          "distinct_values": 7,
+          "null_groups": 0
+        },
+        "amz_ads_daily": {
+          "group_expr": "DATE_FORMAT(f.report_date, '%Y-%m')",
+          "join": "",
+          "distinct_values": 7,
+          "null_groups": 0
+        },
+        "amz_traffic_daily": {
+          "group_expr": "DATE_FORMAT(f.report_date, '%Y-%m')",
+          "join": "",
+          "distinct_values": 7,
+          "null_groups": 0
+        },
+        "amz_fba_inventory": {
+          "group_expr": "DATE_FORMAT(f.snapshot_date, '%Y-%m')",
+          "join": "",
+          "distinct_values": 4,
+          "null_groups": 0
+        },
+        "amz_settlement": {
+          "group_expr": "DATE_FORMAT(f.posted_date, '%Y-%m')",
+          "join": "",
+          "distinct_values": 7,
+          "null_groups": 0
+        },
+        "amz_returns": {
+          "group_expr": "DATE_FORMAT(f.return_date, '%Y-%m')",
+          "join": "",
+          "distinct_values": 7,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "季度",
+      "aliases": [
+        "按季度",
+        "季度"
+      ],
+      "description": "季度粒度趋势",
+      "kind": "time",
+      "supported_tables": [
+        "amz_order_items",
+        "amz_ads_daily",
+        "amz_traffic_daily",
+        "amz_fba_inventory",
+        "amz_settlement",
+        "amz_returns"
+      ],
+      "values": [],
+      "note": "",
+      "field": null,
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "CONCAT(YEAR(f.purchase_date), '-Q', QUARTER(f.purchase_date))",
+          "join": "",
+          "distinct_values": 3,
+          "null_groups": 0
+        },
+        "amz_ads_daily": {
+          "group_expr": "CONCAT(YEAR(f.report_date), '-Q', QUARTER(f.report_date))",
+          "join": "",
+          "distinct_values": 3,
+          "null_groups": 0
+        },
+        "amz_traffic_daily": {
+          "group_expr": "CONCAT(YEAR(f.report_date), '-Q', QUARTER(f.report_date))",
+          "join": "",
+          "distinct_values": 3,
+          "null_groups": 0
+        },
+        "amz_fba_inventory": {
+          "group_expr": "CONCAT(YEAR(f.snapshot_date), '-Q', QUARTER(f.snapshot_date))",
+          "join": "",
+          "distinct_values": 2,
+          "null_groups": 0
+        },
+        "amz_settlement": {
+          "group_expr": "CONCAT(YEAR(f.posted_date), '-Q', QUARTER(f.posted_date))",
+          "join": "",
+          "distinct_values": 3,
+          "null_groups": 0
+        },
+        "amz_returns": {
+          "group_expr": "CONCAT(YEAR(f.return_date), '-Q', QUARTER(f.return_date))",
+          "join": "",
+          "distinct_values": 3,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "站点",
+      "aliases": [
+        "国家",
+        "站点国家",
+        "marketplace",
+        "市场",
+        "区域"
+      ],
+      "description": "亚马逊站点(US/UK/DE/CA)。库里没有 country 或 region 字段,问「国家/市场/区域」一律用站点",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_order_items",
+        "amz_ads_daily",
+        "amz_traffic_daily",
+        "amz_fba_inventory",
+        "amz_settlement",
+        "amz_returns"
+      ],
+      "values": [
+        "US",
+        "UK",
+        "DE",
+        "CA"
+      ],
+      "note": "",
+      "field": "dim_stores.marketplace",
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "d.marketplace",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 4,
+          "null_groups": 0
+        },
+        "amz_ads_daily": {
+          "group_expr": "d.marketplace",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 4,
+          "null_groups": 0
+        },
+        "amz_traffic_daily": {
+          "group_expr": "d.marketplace",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 4,
+          "null_groups": 0
+        },
+        "amz_fba_inventory": {
+          "group_expr": "d.marketplace",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 4,
+          "null_groups": 0
+        },
+        "amz_settlement": {
+          "group_expr": "d.marketplace",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 4,
+          "null_groups": 0
+        },
+        "amz_returns": {
+          "group_expr": "d.marketplace",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 4,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "店铺",
+      "aliases": [
+        "店铺站点",
+        "store",
+        "店铺名称"
+      ],
+      "description": "店铺×站点(US01/CA01/UK01/DE01)",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_order_items",
+        "amz_ads_daily",
+        "amz_traffic_daily",
+        "amz_fba_inventory",
+        "amz_settlement",
+        "amz_returns"
+      ],
+      "values": [
+        "US01",
+        "CA01",
+        "UK01",
+        "DE01"
+      ],
+      "note": "当前每个站点只有一个店铺,店铺与站点一一对应",
+      "field": "dim_stores.store_id",
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "d.store_id",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 4,
+          "null_groups": 0
+        },
+        "amz_ads_daily": {
+          "group_expr": "d.store_id",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 4,
+          "null_groups": 0
+        },
+        "amz_traffic_daily": {
+          "group_expr": "d.store_id",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 4,
+          "null_groups": 0
+        },
+        "amz_fba_inventory": {
+          "group_expr": "d.store_id",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 4,
+          "null_groups": 0
+        },
+        "amz_settlement": {
+          "group_expr": "d.store_id",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 4,
+          "null_groups": 0
+        },
+        "amz_returns": {
+          "group_expr": "d.store_id",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 4,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "运营负责人",
+      "aliases": [
+        "运营",
+        "运营人员",
+        "运营团队"
+      ],
+      "description": "店铺运营负责人",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_order_items",
+        "amz_ads_daily",
+        "amz_traffic_daily",
+        "amz_fba_inventory",
+        "amz_settlement",
+        "amz_returns"
+      ],
+      "values": [
+        "运营A",
+        "运营B"
+      ],
+      "note": "用于按人/团队分析,也是行级权限依据",
+      "field": "dim_stores.owner",
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "d.owner",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 2,
+          "null_groups": 0
+        },
+        "amz_ads_daily": {
+          "group_expr": "d.owner",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 2,
+          "null_groups": 0
+        },
+        "amz_traffic_daily": {
+          "group_expr": "d.owner",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 2,
+          "null_groups": 0
+        },
+        "amz_fba_inventory": {
+          "group_expr": "d.owner",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 2,
+          "null_groups": 0
+        },
+        "amz_settlement": {
+          "group_expr": "d.owner",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 2,
+          "null_groups": 0
+        },
+        "amz_returns": {
+          "group_expr": "d.owner",
+          "join": "JOIN dim_stores d ON f.store_id = d.store_id",
+          "distinct_values": 2,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "品类",
+      "aliases": [
+        "类目",
+        "产品品类",
+        "商品品类",
+        "category"
+      ],
+      "description": "商品品类",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_order_items",
+        "amz_ads_daily",
+        "amz_traffic_daily",
+        "amz_fba_inventory",
+        "amz_settlement",
+        "amz_returns"
+      ],
+      "values": [
+        "厨房用品",
+        "宠物用品",
+        "家居收纳",
+        "家居照明",
+        "户外运动"
+      ],
+      "note": "流量表需通过 ASIN 关联,须先对 dim_products 按 (store_id, asin) 去重;结算表的 MSKU 可为空(店铺级费用如仓储费),这部分费用按品类分组时会落入空值组,需单独说明",
+      "field": "dim_products.category",
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "d.category",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 5,
+          "null_groups": 0
+        },
+        "amz_ads_daily": {
+          "group_expr": "d.category",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 5,
+          "null_groups": 0
+        },
+        "amz_traffic_daily": {
+          "group_expr": "d.category",
+          "join": "JOIN (SELECT DISTINCT store_id, asin, sku, category, owner AS product_owner, status AS product_status, parent_asin FROM dim_products) d ON f.store_id = d.store_id AND f.asin = d.asin",
+          "distinct_values": 5,
+          "null_groups": 0
+        },
+        "amz_fba_inventory": {
+          "group_expr": "d.category",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 5,
+          "null_groups": 0
+        },
+        "amz_settlement": {
+          "group_expr": "d.category",
+          "join": "LEFT JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 6,
+          "null_groups": 1
+        },
+        "amz_returns": {
+          "group_expr": "d.category",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 5,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "SKU",
+      "aliases": [
+        "内部SKU",
+        "产品SKU",
+        "sku",
+        "款式",
+        "商品款"
+      ],
+      "description": "内部 SKU,跨站点相同(如 HS-001),适合比较同一款商品在各站点的表现",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_order_items",
+        "amz_ads_daily",
+        "amz_traffic_daily",
+        "amz_fba_inventory",
+        "amz_settlement",
+        "amz_returns"
+      ],
+      "values": [],
+      "note": "13 个 SKU;要比较「商品」优先用 SKU,而不是 MSKU;结算表 MSKU 可为空,这部分费用按 SKU 分组会落入空值组",
+      "field": "dim_products.sku",
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "d.sku",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 12,
+          "null_groups": 0
+        },
+        "amz_ads_daily": {
+          "group_expr": "d.sku",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 11,
+          "null_groups": 0
+        },
+        "amz_traffic_daily": {
+          "group_expr": "d.sku",
+          "join": "JOIN (SELECT DISTINCT store_id, asin, sku, category, owner AS product_owner, status AS product_status, parent_asin FROM dim_products) d ON f.store_id = d.store_id AND f.asin = d.asin",
+          "distinct_values": 12,
+          "null_groups": 0
+        },
+        "amz_fba_inventory": {
+          "group_expr": "d.sku",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 13,
+          "null_groups": 0
+        },
+        "amz_settlement": {
+          "group_expr": "d.sku",
+          "join": "LEFT JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 14,
+          "null_groups": 1
+        },
+        "amz_returns": {
+          "group_expr": "d.sku",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 12,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "MSKU",
+      "aliases": [
+        "店铺SKU",
+        "msku"
+      ],
+      "description": "店铺×站点级别的 SKU(如 HS-001-US)",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_order_items",
+        "amz_ads_daily",
+        "amz_fba_inventory",
+        "amz_settlement",
+        "amz_returns"
+      ],
+      "values": [],
+      "note": "流量表没有 MSKU,只有 ASIN;50 个 MSKU",
+      "field": "dim_products.msku",
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "f.msku",
+          "join": "",
+          "distinct_values": 46,
+          "null_groups": 0
+        },
+        "amz_ads_daily": {
+          "group_expr": "f.msku",
+          "join": "",
+          "distinct_values": 42,
+          "null_groups": 0
+        },
+        "amz_fba_inventory": {
+          "group_expr": "f.msku",
+          "join": "",
+          "distinct_values": 50,
+          "null_groups": 0
+        },
+        "amz_settlement": {
+          "group_expr": "f.msku",
+          "join": "",
+          "distinct_values": 51,
+          "null_groups": 1
+        },
+        "amz_returns": {
+          "group_expr": "f.msku",
+          "join": "",
+          "distinct_values": 42,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "ASIN",
+      "aliases": [
+        "商品",
+        "商品ASIN",
+        "asin"
+      ],
+      "description": "亚马逊商品编号",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_order_items",
+        "amz_ads_daily",
+        "amz_traffic_daily",
+        "amz_fba_inventory",
+        "amz_returns"
+      ],
+      "values": [],
+      "note": "结算表没有 ASIN(只有 MSKU),涉及结算的指标(平台费用、回款额、利润)不能按 ASIN 分组;一个 ASIN 可对应多个 MSKU",
+      "field": "dim_products.asin",
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "f.asin",
+          "join": "",
+          "distinct_values": 46,
+          "null_groups": 0
+        },
+        "amz_ads_daily": {
+          "group_expr": "f.asin",
+          "join": "",
+          "distinct_values": 42,
+          "null_groups": 0
+        },
+        "amz_traffic_daily": {
+          "group_expr": "f.asin",
+          "join": "",
+          "distinct_values": 46,
+          "null_groups": 0
+        },
+        "amz_fba_inventory": {
+          "group_expr": "f.asin",
+          "join": "",
+          "distinct_values": 50,
+          "null_groups": 0
+        },
+        "amz_returns": {
+          "group_expr": "f.asin",
+          "join": "",
+          "distinct_values": 42,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "产品负责人",
+      "aliases": [
+        "产品经理",
+        "产品负责人",
+        "PM"
+      ],
+      "description": "商品对应的产品负责人",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_order_items",
+        "amz_ads_daily",
+        "amz_traffic_daily",
+        "amz_fba_inventory",
+        "amz_settlement",
+        "amz_returns"
+      ],
+      "values": [
+        "产品经理甲",
+        "产品经理乙"
+      ],
+      "note": "",
+      "field": "dim_products.owner",
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "d.owner",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 2,
+          "null_groups": 0
+        },
+        "amz_ads_daily": {
+          "group_expr": "d.owner",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 2,
+          "null_groups": 0
+        },
+        "amz_traffic_daily": {
+          "group_expr": "d.product_owner",
+          "join": "JOIN (SELECT DISTINCT store_id, asin, sku, category, owner AS product_owner, status AS product_status, parent_asin FROM dim_products) d ON f.store_id = d.store_id AND f.asin = d.asin",
+          "distinct_values": 2,
+          "null_groups": 0
+        },
+        "amz_fba_inventory": {
+          "group_expr": "d.owner",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 2,
+          "null_groups": 0
+        },
+        "amz_settlement": {
+          "group_expr": "d.owner",
+          "join": "LEFT JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 3,
+          "null_groups": 1
+        },
+        "amz_returns": {
+          "group_expr": "d.owner",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 2,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "商品状态",
+      "aliases": [
+        "在售状态",
+        "上下架状态"
+      ],
+      "description": "商品是否在售",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_order_items",
+        "amz_ads_daily",
+        "amz_traffic_daily",
+        "amz_fba_inventory",
+        "amz_settlement",
+        "amz_returns"
+      ],
+      "values": [
+        "Active",
+        "Inactive"
+      ],
+      "note": "",
+      "field": "dim_products.status",
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "d.status",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 1,
+          "null_groups": 0
+        },
+        "amz_ads_daily": {
+          "group_expr": "d.status",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 1,
+          "null_groups": 0
+        },
+        "amz_traffic_daily": {
+          "group_expr": "d.product_status",
+          "join": "JOIN (SELECT DISTINCT store_id, asin, sku, category, owner AS product_owner, status AS product_status, parent_asin FROM dim_products) d ON f.store_id = d.store_id AND f.asin = d.asin",
+          "distinct_values": 1,
+          "null_groups": 0
+        },
+        "amz_fba_inventory": {
+          "group_expr": "d.status",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 2,
+          "null_groups": 0
+        },
+        "amz_settlement": {
+          "group_expr": "d.status",
+          "join": "LEFT JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 3,
+          "null_groups": 1
+        },
+        "amz_returns": {
+          "group_expr": "d.status",
+          "join": "JOIN dim_products d ON f.store_id = d.store_id AND f.msku = d.msku",
+          "distinct_values": 1,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "订单状态",
+      "aliases": [
+        "状态",
+        "订单状态"
+      ],
+      "description": "订单所处状态;统计销售类指标时默认排除 Canceled 和 Pending",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_order_items"
+      ],
+      "values": [
+        "Shipped",
+        "Unshipped",
+        "Pending",
+        "Canceled"
+      ],
+      "note": "只在需要分析取消率/待处理订单时作为维度使用",
+      "field": "amz_order_items.order_status",
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "f.order_status",
+          "join": "",
+          "distinct_values": 4,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "币种",
+      "aliases": [
+        "原币种",
+        "货币"
+      ],
+      "description": "订单/广告/结算的原币种",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_order_items",
+        "amz_ads_daily",
+        "amz_settlement"
+      ],
+      "values": [
+        "USD",
+        "GBP",
+        "EUR",
+        "CAD"
+      ],
+      "note": "币种与站点一一对应,一般用站点即可",
+      "field": "amz_order_items.currency",
+      "sql_by_table": {
+        "amz_order_items": {
+          "group_expr": "f.currency",
+          "join": "",
+          "distinct_values": 4,
+          "null_groups": 0
+        },
+        "amz_ads_daily": {
+          "group_expr": "f.currency",
+          "join": "",
+          "distinct_values": 4,
+          "null_groups": 0
+        },
+        "amz_settlement": {
+          "group_expr": "f.currency",
+          "join": "",
+          "distinct_values": 4,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "广告类型",
+      "aliases": [
+        "SP",
+        "SB",
+        "广告形式",
+        "ad_type"
+      ],
+      "description": "广告类型",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_ads_daily"
+      ],
+      "values": [
+        "SP",
+        "SB"
+      ],
+      "note": "",
+      "field": "amz_ads_daily.ad_type",
+      "sql_by_table": {
+        "amz_ads_daily": {
+          "group_expr": "f.ad_type",
+          "join": "",
+          "distinct_values": 2,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "广告活动",
+      "aliases": [
+        "campaign",
+        "广告系列",
+        "广告组合",
+        "活动"
+      ],
+      "description": "广告活动(名称含站点_类型_投放方式_SKU)",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_ads_daily"
+      ],
+      "values": [],
+      "note": "活动名称中的 Auto/Manual 表示自动/手动投放",
+      "field": "amz_ads_daily.campaign_name",
+      "sql_by_table": {
+        "amz_ads_daily": {
+          "group_expr": "f.campaign_name",
+          "join": "",
+          "distinct_values": 104,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "费用类型",
+      "aliases": [
+        "结算类型",
+        "费用项目",
+        "fee_type",
+        "费用项"
+      ],
+      "description": "结算明细类型",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_settlement"
+      ],
+      "values": [
+        "principal",
+        "commission",
+        "fba_fee",
+        "storage_fee",
+        "promotion",
+        "refund",
+        "other"
+      ],
+      "note": "平台费用只含 commission、fba_fee、storage_fee",
+      "field": "amz_settlement.fee_type",
+      "sql_by_table": {
+        "amz_settlement": {
+          "group_expr": "f.fee_type",
+          "join": "",
+          "distinct_values": 7,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "退货原因",
+      "aliases": [
+        "退货理由",
+        "reason"
+      ],
+      "description": "退货原因",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_returns"
+      ],
+      "values": [
+        "DEFECTIVE",
+        "NOT_AS_DESCRIBED",
+        "NO_LONGER_NEEDED",
+        "NO_REASON_GIVEN",
+        "QUALITY_UNACCEPTABLE",
+        "TOO_SMALL",
+        "WRONG_ITEM"
+      ],
+      "note": "",
+      "field": "amz_returns.reason",
+      "sql_by_table": {
+        "amz_returns": {
+          "group_expr": "f.reason",
+          "join": "",
+          "distinct_values": 7,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "退货处置",
+      "aliases": [
+        "处置结果",
+        "disposition"
+      ],
+      "description": "退货商品处置结果",
+      "kind": "entity",
+      "supported_tables": [
+        "amz_returns"
+      ],
+      "values": [
+        "SELLABLE",
+        "DAMAGED",
+        "CUSTOMER_DAMAGED",
+        "DEFECTIVE"
+      ],
+      "note": "",
+      "field": "amz_returns.disposition",
+      "sql_by_table": {
+        "amz_returns": {
+          "group_expr": "f.disposition",
+          "join": "",
+          "distinct_values": 4,
+          "null_groups": 0
+        }
+      }
+    },
+    {
+      "name": "库龄分段",
+      "aliases": [
+        "库龄",
+        "库龄段",
+        "库龄区间"
+      ],
+      "description": "库存按库龄分段:0-90、91-180、181-270、271-365、365+ 天",
+      "kind": "special",
+      "supported_tables": [
+        "amz_fba_inventory"
+      ],
+      "values": [
+        "0-90天",
+        "91-180天",
+        "181-270天",
+        "271-365天",
+        "365天以上"
+      ],
+      "note": "库存表是宽表(每段一列),按库龄分段分析时需分别取各列求和(列转行),高库龄=181天以上三段之和;只取最新快照",
+      "field": "amz_fba_inventory.age_0_90_qty",
+      "sql_by_table": {}
+    },
+    {
+      "name": "驱动因素",
+      "aliases": [
+        "原因类型",
+        "归因因素",
+        "影响因素"
+      ],
+      "description": "归因分析用的概念维度,不对应字段:流量(会话数)、转化率、客单价、广告投入、Buy Box、价格/促销、库存、退货",
+      "kind": "concept",
+      "supported_tables": [],
+      "values": [
+        "流量",
+        "转化率",
+        "客单价",
+        "广告投入",
+        "Buy Box",
+        "促销",
+        "库存",
+        "退货"
+      ],
+      "note": "仅用于「为什么涨/跌」的拆解,每个驱动因素对应一个具体指标,任务里要落到指标上",
+      "field": null,
+      "sql_by_table": {}
+    }
+  ],
+  "metric_dimension_support": {
+    "销售额": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "订单状态",
+      "币种"
+    ],
+    "订单量": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "订单状态",
+      "币种"
+    ],
+    "销量": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "订单状态",
+      "币种"
+    ],
+    "客单价": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "订单状态",
+      "币种"
+    ],
+    "商品成本": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "订单状态",
+      "币种"
+    ],
+    "毛利": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "订单状态",
+      "币种"
+    ],
+    "毛利率": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "订单状态",
+      "币种"
+    ],
+    "广告花费": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "币种",
+      "广告类型",
+      "广告活动"
+    ],
+    "广告销售额": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "币种",
+      "广告类型",
+      "广告活动"
+    ],
+    "ACOS": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "币种",
+      "广告类型",
+      "广告活动"
+    ],
+    "ROAS": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "币种",
+      "广告类型",
+      "广告活动"
+    ],
+    "CPC": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "币种",
+      "广告类型",
+      "广告活动"
+    ],
+    "广告点击率": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "币种",
+      "广告类型",
+      "广告活动"
+    ],
+    "广告转化率": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "币种",
+      "广告类型",
+      "广告活动"
+    ],
+    "会话数": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态"
+    ],
+    "转化率": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态"
+    ],
+    "Buy Box占比": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态"
+    ],
+    "平台费用": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "产品负责人",
+      "商品状态",
+      "币种",
+      "费用类型"
+    ],
+    "回款额": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "产品负责人",
+      "商品状态",
+      "币种",
+      "费用类型"
+    ],
+    "退货率": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态"
+    ],
+    "FBA可售库存": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "库龄分段"
+    ],
+    "可售天数": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态"
+    ],
+    "高库龄库存占比": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "库龄分段"
+    ],
+    "滞销库存金额": [
+      "库龄分段"
+    ],
+    "TACOS": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "币种"
+    ],
+    "利润": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "产品负责人",
+      "商品状态",
+      "币种"
+    ],
+    "站点销售额": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "订单状态",
+      "币种"
+    ],
+    "ASIN销售额": [
+      "日期",
+      "周",
+      "月份",
+      "季度",
+      "站点",
+      "店铺",
+      "运营负责人",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "产品负责人",
+      "商品状态",
+      "订单状态",
+      "币种"
+    ]
+  },
+  "decomposition_strategies": {
+    "趋势分析": "主指标趋势(按日或周或月) + 关键驱动指标趋势 + 异常时间点定位 + 原因归纳,不超过 6 个子任务",
+    "销售波动归因": "销售额 = 会话数 × 转化率 × 客单价。拆成:销售额趋势或同期对比 → 会话数变化 → 转化率变化 → 客单价变化(订单口径) → 定位到站点/品类/SKU → 结论汇总,不超过 6 个子任务",
+    "广告效率诊断": "广告花费与广告销售额趋势 → ACOS/ROAS 按站点或广告类型对比 → ACOS 偏高的 SKU 或广告活动定位 → 与总销售额对比(TACOS) → 结论汇总,不超过 6 个子任务",
+    "库存风险分析": "最新快照可售库存 → 近 30 天日均销量 → 可售天数偏低的 SKU(断货风险) → 高库龄库存和滞销库存金额(积压风险) → 补货/清仓建议汇总,不超过 6 个子任务",
+    "利润分析": "销售额 → 商品成本 → 平台费用 → 广告花费(四块分别取数,不要在一条 SQL 里联表相乘) → 按站点或品类汇总利润 → 结论,不超过 6 个子任务",
+    "退货与质量分析": "退货率总体及趋势 → 按品类或 SKU 定位退货率高的商品 → 退货原因分布 → 处置结果 → 结论,不超过 5 个子任务",
+    "维度对比": "核心维度排名/贡献 + 必要补充维度 + 结论汇总,不超过 5 个子任务",
+    "综合经营分析": "销售 → 流量转化 → 广告 → 库存 → 退货,每个主题 1 步,最后汇总问题与建议,不超过 7 个子任务;不要把不同主题塞进同一步"
+  },
+  "rules": [
+    "子任务中的维度只能使用 name 或 aliases 中的词,并先归一到 name",
+    "一个子任务里的指标和维度必须落在同一张(或可安全关联的)事实表上,否则拆成多个子任务",
+    "不同事实表的指标要对比时,各自分组聚合后再汇总,不要直接 JOIN 两张事实表",
+    "没有对应数据的维度(如竞品、价格带、关键词、买家地区、渠道)不得使用,应回退到最接近的已有维度并说明"
+  ]
+}

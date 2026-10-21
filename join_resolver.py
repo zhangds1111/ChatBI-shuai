@@ -14,84 +14,18 @@ from collections import deque
 
 
 # ==================== 表关联图配置 ====================
-# 手动维护表间关系，原因：
-# 1. 企业数据库常不建外键约束
-# 2. 需要区分 JOIN / LEFT JOIN
-# 3. 支持复合键
-TABLE_RELATIONSHIPS = {
-    "sales_orders": [
-        {
-            "target": "dim_customers",
-            "fk_col": "customer_id",
-            "pk_col": "customer_id",
-            "join_type": "JOIN",
-        },
-        {
-            "target": "dim_products",
-            "fk_col": "product_id",
-            "pk_col": "product_id",
-            "join_type": "JOIN",
-        },
-        {
-            "target": "exchange_rates",
-            "fk_col": "order_date, currency",
-            "pk_col": "rate_date, currency",
-            "join_type": "LEFT JOIN",
-        },
-    ],
-    # 从维度表出发找事实表时，应使用 LEFT JOIN：不是所有维度值都有对应的事实记录
-    "dim_customers": [
-        {
-            "target": "sales_orders",
-            "fk_col": "customer_id",
-            "pk_col": "customer_id",
-            "join_type": "LEFT JOIN",
-        },
-    ],
-    "dim_products": [
-        {
-            "target": "sales_orders",
-            "fk_col": "product_id",
-            "pk_col": "product_id",
-            "join_type": "LEFT JOIN",
-        },
-    ],
-    "exchange_rates": [
-        {
-            "target": "sales_orders",
-            "fk_col": "rate_date, currency",
-            "pk_col": "order_date, currency",
-            "join_type": "LEFT JOIN",
-        },
-    ],
-    # 费用表与订单表在业务上独立，不建立直接关联
-    "finance_expenses": [],
-}
-
-
-# ==================== 表类型与业务关键词 ====================
-TABLE_TYPES = {
-    "sales_orders": "fact",
-    "finance_expenses": "fact",
-    "dim_customers": "dimension",
-    "dim_products": "dimension",
-    "exchange_rates": "reference",
-}
-
-# 用于锚表选择的关键词匹配
-TABLE_KEYWORDS = {
-    "sales_orders": ["收入", "销售额", "订单", "销售", "数量", "金额", "毛利", "利润", "net_amount", "gross_amount"],
-    "finance_expenses": ["费用", "研发", "销售费用", "管理费用", "财务费用", "期间费用", "expense"],
-    "dim_customers": ["客户", "客户类型", "OEM", "储能集成商", "电网集团", "customer"],
-    "dim_products": ["产品", "产品线", "型号", "SKU", "product"],
-    "exchange_rates": ["汇率", "币种", "人民币", "美元", "欧元", "rate"],
-}
+# 业务背景：跨境电商（Amazon 多站点），关联图外置到 knowledge_loader（table_relationships.json）
+from knowledge_loader import (  # noqa: E402
+    TABLE_RELATIONSHIPS,
+    TABLE_TYPES,
+    TABLE_KEYWORDS,
+)
+from tracing import traceable  # noqa: E402
 
 # 查询意图信号词
-METRIC_SIGNALS = ["统计", "多少", "总计", "平均", "占比", "总和", "额", "量"]
+METRIC_SIGNALS = ["统计", "多少", "总计", "平均", "占比", "总和", "额", "量", "率"]
 ENTITY_SIGNALS = ["列出", "哪些", "所有", "没有", "明细", "每个"]
-STRONG_METRIC_WORDS = ["收入", "销售额", "费用", "毛利", "利润", "金额", "数量"]
-
+STRONG_METRIC_WORDS = ["销售额", "销量", "订单", "广告", "毛利", "利润", "金额", "数量", "退货", "库存", "ACOS", "转化率"]
 
 # ==================== 锚表选择 ====================
 def _classify_intent(query: str) -> str:
@@ -163,6 +97,7 @@ def _most_central_table(candidate_tables: list[str], relationships: dict) -> str
     return min(candidate_tables, key=lambda t: total_distances[t])
 
 
+@traceable(name="锚表选择", run_type="tool")
 def select_anchor(query: str, candidate_tables: list[str], relationships: dict = None) -> tuple[str, str]:
     """
     根据用户问题选择锚表。
@@ -236,6 +171,7 @@ def _build_on_clause(from_table: str, to_table: str, edge: dict) -> str:
     return " AND ".join(conditions)
 
 
+@traceable(name="关联路径推理", run_type="tool")
 def resolve_joins(anchor_table: str, target_tables: list[str], relationships: dict = None) -> dict:
     """
     从锚表出发，推导连接所有目标表的 Join 路径。

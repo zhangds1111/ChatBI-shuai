@@ -19,6 +19,7 @@ from join_resolver import (
     TABLE_TYPES,
     TABLE_KEYWORDS,
 )
+from tracing import traceable
 
 
 # ==================== Schema Linking Pipeline ====================
@@ -81,6 +82,7 @@ def _ensure_fact_table_for_metric(query: str, tables: list[dict]) -> list[dict]:
     return tables
 
 
+@traceable(name="Schema链接管线", run_type="chain")
 def schema_link(
     query: str,
     table_top_k: int = 3,
@@ -236,6 +238,7 @@ def _assemble_dynamic_schema(
 
 
 # ==================== Prompt 集成接口 ====================
+@traceable(name="Schema链接", run_type="chain")
 def build_dynamic_prompt_schema(query: str) -> str:
     """
     供 prompt_builder.py 调用的简化接口。

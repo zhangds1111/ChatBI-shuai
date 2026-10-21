@@ -13,7 +13,7 @@
             min-height: 100vh;
         }
         .container {
-            max-width: 900px;
+            max-width: 960px;
             margin: 0 auto;
             padding: 24px 16px;
         }
@@ -21,7 +21,37 @@
             text-align: center;
             font-size: 24px;
             color: #1a1a2e;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
+        }
+        /* 模式切换 */
+        .mode-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .mode-tab {
+            padding: 8px 20px;
+            font-size: 14px;
+            border: 1.5px solid #d0d7e2;
+            background: #fff;
+            color: #667;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .mode-tab:hover { border-color: #4a6cf7; color: #4a6cf7; }
+        .mode-tab.active {
+            background: #4a6cf7;
+            border-color: #4a6cf7;
+            color: #fff;
+            font-weight: 600;
+        }
+        .mode-hint {
+            text-align: center;
+            font-size: 12px;
+            color: #9aa;
+            margin-bottom: 16px;
         }
         /* 输入区域 */
         .input-area {
@@ -101,6 +131,10 @@
             font-size: 14px;
             font-weight: 700;
             flex-shrink: 0;
+        }
+        .question-row .q-icon.agent {
+            background: #fff3e0;
+            color: #e67e22;
         }
         .question-row .q-text {
             font-size: 15px;
@@ -265,11 +299,379 @@
             padding: 48px 0;
             font-size: 15px;
         }
+
+        /* ==================== 复杂分析（Agent） ==================== */
+        /* 阶段进度条 */
+        .agent-stages {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            margin: 8px 0 18px;
+            padding: 12px 8px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+        .stage-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #b0b8c4;
+            white-space: nowrap;
+        }
+        .stage-item .stage-dot {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #e4e9f0;
+            color: #99a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .stage-item.active { color: #4a6cf7; font-weight: 600; }
+        .stage-item.active .stage-dot {
+            background: #4a6cf7;
+            color: #fff;
+            animation: pulse 1.2s infinite;
+        }
+        .stage-item.done { color: #2e9e5b; }
+        .stage-item.done .stage-dot {
+            background: #2e9e5b;
+            color: #fff;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(74,108,247,0.4); }
+            50% { box-shadow: 0 0 0 5px rgba(74,108,247,0); }
+        }
+        .stage-line {
+            flex: 1;
+            height: 2px;
+            background: #e4e9f0;
+            margin: 0 8px;
+            min-width: 16px;
+        }
+        .stage-line.done { background: #2e9e5b; }
+
+        /* 子任务卡片（问题差分） */
+        .subtask-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .subtask-card {
+            border: 1px solid #e6ebf2;
+            border-left: 3px solid #4a6cf7;
+            border-radius: 6px;
+            padding: 10px 12px;
+            background: #fafbfe;
+            font-size: 13px;
+        }
+        .subtask-card .st-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        .subtask-card .st-id {
+            font-family: monospace;
+            font-size: 11px;
+            background: #e8f0fe;
+            color: #4a6cf7;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .subtask-card .st-name {
+            font-weight: 600;
+            color: #1a1a2e;
+        }
+        .subtask-card .st-type {
+            margin-left: auto;
+            font-size: 11px;
+            color: #889;
+            background: #eef1f6;
+            padding: 1px 8px;
+            border-radius: 10px;
+        }
+        .subtask-card .st-desc {
+            color: #667;
+            line-height: 1.5;
+        }
+        .subtask-card .st-meta {
+            margin-top: 4px;
+            font-size: 12px;
+            color: #99a;
+        }
+        .goal-box {
+            background: #f0f5ff;
+            border: 1px solid #d6e2fb;
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 13px;
+            color: #334;
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+        .goal-box b { color: #4a6cf7; }
+
+        /* 执行计划步骤 */
+        .plan-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+        .plan-step-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border: 1px solid #e6ebf2;
+            border-radius: 6px;
+            font-size: 13px;
+            background: #fff;
+        }
+        .plan-step-row .ps-num {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #eef1f6;
+            color: #667;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .plan-step-row .ps-name { font-weight: 600; color: #223; }
+        .plan-step-row .ps-dep {
+            margin-left: auto;
+            font-size: 11px;
+            color: #99a;
+            font-family: monospace;
+        }
+        .plan-step-row .ps-exp {
+            width: 100%;
+            color: #889;
+            font-size: 12px;
+        }
+        .plan-step-col {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
+        }
+
+        /* 子任务执行卡片 */
+        .exec-step {
+            border: 1px solid #e6ebf2;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        .exec-step.running { border-color: #4a6cf7; }
+        .exec-step.completed { border-color: #b7e0c4; }
+        .exec-step.failed { border-color: #f0b6b0; }
+        .exec-step.skipped { border-color: #ddd; opacity: 0.75; }
+        .exec-step-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: #fafbfc;
+            cursor: pointer;
+            user-select: none;
+        }
+        .exec-step.running .exec-step-head { background: #eef3ff; }
+        .exec-step.completed .exec-step-head { background: #f0faf3; }
+        .exec-step.failed .exec-step-head { background: #fff5f4; }
+        .exec-step-head .es-num {
+            font-family: monospace;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: #e8eef8;
+            color: #4a6cf7;
+            flex-shrink: 0;
+        }
+        .exec-step-head .es-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #223;
+        }
+        .exec-step-head .es-status {
+            margin-left: auto;
+            font-size: 12px;
+            padding: 2px 10px;
+            border-radius: 10px;
+            flex-shrink: 0;
+        }
+        .es-status.st-running {
+            background: #e8f0fe;
+            color: #4a6cf7;
+        }
+        .es-status.st-running::before {
+            content: "";
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border: 2px solid #4a6cf7;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: -1px;
+            margin-right: 5px;
+        }
+        .es-status.st-completed { background: #e6f6ec; color: #2e9e5b; }
+        .es-status.st-failed { background: #ffebe8; color: #d4380d; }
+        .es-status.st-skipped { background: #f0f0f0; color: #999; }
+        .exec-step-head .es-toggle {
+            color: #aab;
+            font-size: 12px;
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+        .exec-step.collapsed .es-toggle { transform: rotate(-90deg); }
+        .exec-step.collapsed .exec-step-body { display: none; }
+        .exec-step-body {
+            padding: 12px 14px;
+            border-top: 1px solid #f0f2f5;
+        }
+        .exec-step-body .es-question {
+            font-size: 12px;
+            color: #778;
+            background: #f8fafc;
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        /* 报告区块 */
+        .report-card {
+            border: 1px solid #d6e2fb;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .report-head {
+            background: linear-gradient(135deg, #4a6cf7, #6b8afd);
+            color: #fff;
+            padding: 14px 18px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .report-body {
+            padding: 16px 18px;
+        }
+        .report-summary {
+            font-size: 14px;
+            line-height: 1.8;
+            color: #334;
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 14px;
+        }
+        .report-block {
+            margin-bottom: 14px;
+        }
+        .report-block .rb-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #4a6cf7;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .report-block ul {
+            list-style: none;
+            padding: 0;
+        }
+        .report-block li {
+            font-size: 13px;
+            line-height: 1.7;
+            color: #445;
+            padding: 4px 0 4px 18px;
+            position: relative;
+        }
+        .report-block li::before {
+            content: "";
+            position: absolute;
+            left: 4px;
+            top: 12px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #4a6cf7;
+        }
+        .report-block.root li::before { background: #e67e22; }
+        .report-block.action li::before { background: #2e9e5b; }
+        .trend-box {
+            font-size: 13px;
+            color: #334;
+            background: #fff8ec;
+            border: 1px solid #f5e0b8;
+            border-radius: 8px;
+            padding: 10px 14px;
+            line-height: 1.7;
+        }
+        .report-md {
+            margin-top: 14px;
+            border-top: 1px dashed #dde;
+            padding-top: 12px;
+        }
+        .report-md summary {
+            font-size: 12px;
+            color: #889;
+            cursor: pointer;
+            user-select: none;
+        }
+        .report-md pre {
+            margin-top: 8px;
+            font-size: 12px;
+            line-height: 1.7;
+            color: #556;
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        .summary-mini {
+            font-size: 13px;
+            color: #667;
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+            line-height: 1.7;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>ChatBI MVP</h1>
+
+        <!-- 模式切换入口 -->
+        <div class="mode-tabs">
+            <button class="mode-tab active" id="tabAuto" onclick="setMode('auto')">🚀 智能路由</button>
+            <button class="mode-tab" id="tabSimple" onclick="setMode('simple')">🔍 简单查询</button>
+            <button class="mode-tab" id="tabAgent" onclick="setMode('agent')">🧠 复杂分析</button>
+        </div>
+        <div class="mode-hint" id="modeHint">自动识别问题类型：简单指标问题直接查询，复杂分析问题多步拆解</div>
+
         <div class="input-area">
             <input
                 type="text"
@@ -289,11 +691,34 @@
     <script>
         const API_BASE = '';  // 同源，不需要额外前缀
         let abortController = null;
+        let currentMode = 'auto';  // 'auto' | 'simple' | 'agent'
 
         const questionInput = document.getElementById('questionInput');
         const submitBtn = document.getElementById('submitBtn');
         const chatArea = document.getElementById('chatArea');
         const initialEmpty = document.getElementById('initialEmpty');
+        const modeHint = document.getElementById('modeHint');
+
+        // ==================== 模式切换 ====================
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('tabAuto').classList.toggle('active', mode === 'auto');
+            document.getElementById('tabSimple').classList.toggle('active', mode === 'simple');
+            document.getElementById('tabAgent').classList.toggle('active', mode === 'agent');
+            if (mode === 'auto') {
+                modeHint.textContent = '自动识别问题类型：简单指标问题直接查询，复杂分析问题多步拆解';
+                questionInput.placeholder = '直接提问，例如：上月销售额是多少？/ 最近三个月利润为什么下降？';
+                submitBtn.textContent = '提问';
+            } else if (mode === 'simple') {
+                modeHint.textContent = '单指标问答：一句话生成 SQL 并返回查询结果（强制直接查询）';
+                questionInput.placeholder = '输入业务问题，例如：上个月销售额是多少？';
+                submitBtn.textContent = '查询';
+            } else {
+                modeHint.textContent = '复杂问题分析：问题差分 → 执行计划 → 子任务逐步执行 → 分析报告（强制多步分析）';
+                questionInput.placeholder = '输入复杂分析问题，例如：最近三个月利润为什么下降？';
+                submitBtn.textContent = '开始分析';
+            }
+        }
 
         // 回车提交
         questionInput.addEventListener('keydown', (e) => {
@@ -309,20 +734,18 @@
 
         function now() { return performance.now(); }
 
+        // ==================== 提交入口 ====================
         async function submitQuery() {
             const question = questionInput.value.trim();
             if (!question) return;
 
-            // 隐藏初始空状态
             if (initialEmpty) initialEmpty.style.display = 'none';
 
-            // 切换为"查询中"状态
             questionInput.disabled = true;
             submitBtn.textContent = '取消';
             submitBtn.classList.add('cancel');
             submitBtn.onclick = cancelQuery;
 
-            // 创建对话卡片
             const card = document.createElement('div');
             card.className = 'chat-card';
 
@@ -330,12 +753,75 @@
             const questionRow = document.createElement('div');
             questionRow.className = 'question-row';
             questionRow.innerHTML = `
-                <div class="q-icon">Q</div>
+                <div class="q-icon ${currentMode === 'agent' ? 'agent' : ''}">${currentMode === 'agent' ? 'A' : 'Q'}</div>
                 <div class="q-text">${escapeHtml(question)}</div>
                 <div class="q-time">${new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'})}</div>
             `;
             card.appendChild(questionRow);
+            chatArea.insertBefore(card, chatArea.firstChild);
 
+            if (currentMode === 'agent') {
+                await runAgent(question, card);
+            } else if (currentMode === 'auto') {
+                await runAuto(question, card);
+            } else {
+                await runSimple(question, card);
+            }
+        }
+
+        function cancelQuery() {
+            if (abortController) {
+                abortController.abort();
+                abortController = null;
+            }
+        }
+
+        function resetInput() {
+            questionInput.disabled = false;
+            submitBtn.classList.remove('cancel');
+            submitBtn.onclick = submitQuery;
+            submitBtn.textContent = currentMode === 'agent' ? '开始分析' : currentMode === 'auto' ? '提问' : '查询';
+            submitBtn.disabled = false;
+            questionInput.focus();
+        }
+
+        // ==================== SSE 通用解析 ====================
+        async function readSSE(response, onEvent) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const parts = buffer.split('\n\n');
+                buffer = parts.pop();
+
+                for (const part of parts) {
+                    if (!part.trim()) continue;
+                    let eventType = '';
+                    let eventData = {};
+                    for (const line of part.split('\n')) {
+                        if (line.startsWith('event: ')) {
+                            eventType = line.slice(7).trim();
+                        } else if (line.startsWith('data: ')) {
+                            try {
+                                eventData = JSON.parse(line.slice(6));
+                            } catch (e) {
+                                console.warn('Failed to parse SSE data:', line);
+                            }
+                        }
+                    }
+                    if (!eventType) continue;
+                    onEvent(eventType, eventData);
+                }
+            }
+        }
+
+        // ==================== 简单查询链路 ====================
+        async function runSimple(question, card) {
             // SQL 展示区
             const sqlSection = document.createElement('div');
             const sqlTitle = document.createElement('div');
@@ -350,7 +836,6 @@
             sqlBox.appendChild(cursorSpan);
             sqlSection.appendChild(sqlBox);
 
-            // SQL 工具栏（先隐藏）
             const sqlToolbar = document.createElement('div');
             sqlToolbar.className = 'sql-toolbar';
             sqlToolbar.style.display = 'none';
@@ -362,26 +847,20 @@
             sqlToolbar.appendChild(copyBtn);
             sqlToolbar.appendChild(durationSpan);
             sqlSection.appendChild(sqlToolbar);
-
             card.appendChild(sqlSection);
 
-            // 状态行
             const statusDiv = document.createElement('div');
             statusDiv.className = 'status thinking';
             statusDiv.textContent = '正在生成 SQL...';
             card.appendChild(statusDiv);
 
-            // 结果区占位
             const resultSection = document.createElement('div');
             card.appendChild(resultSection);
 
-            chatArea.insertBefore(card, chatArea.firstChild);
-
-            // SSE 请求
             abortController = new AbortController();
             let fullSql = '';
             const startTime = now();
-            let sqlStartTime = startTime;
+            const sqlStartTime = startTime;
             let sqlEndTime = 0;
 
             try {
@@ -391,99 +870,52 @@
                     body: JSON.stringify({ question }),
                     signal: abortController.signal,
                 });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
+                await readSSE(response, (eventType, eventData) => {
+                    switch (eventType) {
+                        case 'sql_chunk':
+                            if (!eventData.content) break;
+                            fullSql += eventData.content;
+                            sqlBox.textContent = fullSql;
+                            sqlBox.appendChild(cursorSpan);
+                            break;
 
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
+                        case 'sql_done':
+                            fullSql = eventData.sql || fullSql;
+                            sqlBox.textContent = fullSql;
+                            if (cursorSpan.parentNode) cursorSpan.remove();
+                            sqlEndTime = now();
+                            sqlToolbar.style.display = 'flex';
+                            durationSpan.textContent = `生成耗时 ${formatTime(sqlEndTime - sqlStartTime)}`;
+                            copyBtn.onclick = () => {
+                                navigator.clipboard.writeText(fullSql).then(() => {
+                                    copyBtn.textContent = '已复制';
+                                    copyBtn.classList.add('copied');
+                                    setTimeout(() => {
+                                        copyBtn.textContent = '复制 SQL';
+                                        copyBtn.classList.remove('copied');
+                                    }, 2000);
+                                });
+                            };
+                            statusDiv.className = 'status thinking';
+                            statusDiv.textContent = 'SQL 执行中...';
+                            break;
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
+                        case 'result':
+                            statusDiv.className = 'status';
+                            statusDiv.textContent = `查询完成，总耗时 ${formatTime(now() - startTime)}`;
+                            renderResult(resultSection, eventData);
+                            break;
 
-                    buffer += decoder.decode(value, { stream: true });
-
-                    // 按 \n\n 分割 SSE 事件
-                    const parts = buffer.split('\n\n');
-                    buffer = parts.pop();  // 最后一段可能不完整，留到下次
-
-                    for (const part of parts) {
-                        if (!part.trim()) continue;
-
-                        let eventType = '';
-                        let eventData = {};
-
-                        for (const line of part.split('\n')) {
-                            if (line.startsWith('event: ')) {
-                                eventType = line.slice(7).trim();
-                            } else if (line.startsWith('data: ')) {
-                                try {
-                                    eventData = JSON.parse(line.slice(6));
-                                } catch (e) {
-                                    console.warn('Failed to parse SSE data:', line);
-                                }
-                            }
-                        }
-
-                        if (!eventType) continue;
-
-                        switch (eventType) {
-                            case 'sql_chunk':
-                                // 过滤空内容
-                                if (!eventData.content) break;
-                                fullSql += eventData.content;
-                                // 更新 SQL 文本（保留光标）
-                                sqlBox.textContent = fullSql;
-                                sqlBox.appendChild(cursorSpan);
-                                break;
-
-                            case 'sql_done':
-                                // SQL 生成完毕，移除光标
-                                fullSql = eventData.sql || fullSql;
-                                sqlBox.textContent = fullSql;
-                                if (cursorSpan.parentNode) cursorSpan.remove();
-
-                                sqlEndTime = now();
-                                // 显示工具栏
-                                sqlToolbar.style.display = 'flex';
-                                durationSpan.textContent = `生成耗时 ${formatTime(sqlEndTime - sqlStartTime)}`;
-
-                                // 绑定复制按钮
-                                copyBtn.onclick = () => {
-                                    navigator.clipboard.writeText(fullSql).then(() => {
-                                        copyBtn.textContent = '已复制';
-                                        copyBtn.classList.add('copied');
-                                        setTimeout(() => {
-                                            copyBtn.textContent = '复制 SQL';
-                                            copyBtn.classList.remove('copied');
-                                        }, 2000);
-                                    });
-                                };
-
-                                statusDiv.className = 'status thinking';
-                                statusDiv.textContent = 'SQL 执行中...';
-                                break;
-
-                            case 'result':
-                                // 查询结果
-                                const totalTime = now() - startTime;
-                                statusDiv.className = 'status';
-                                statusDiv.textContent = `查询完成，总耗时 ${formatTime(totalTime)}`;
-                                renderResult(resultSection, eventData);
-                                break;
-
-                            case 'error':
-                                statusDiv.className = 'status';
-                                statusDiv.textContent = '';
-                                renderError(resultSection, eventData);
-                                if (cursorSpan.parentNode) cursorSpan.remove();
-                                break;
-                        }
+                        case 'error':
+                            statusDiv.className = 'status';
+                            statusDiv.textContent = '';
+                            renderError(resultSection, eventData);
+                            if (cursorSpan.parentNode) cursorSpan.remove();
+                            break;
                     }
-                }
+                });
             } catch (e) {
                 if (e.name === 'AbortError') {
                     statusDiv.className = 'status';
@@ -500,26 +932,478 @@
             }
         }
 
-        function cancelQuery() {
-            if (abortController) {
-                abortController.abort();
-                abortController = null;
+        // ==================== 复杂分析链路（Agent） ====================
+        async function runAgent(question, card) {
+            // 阶段进度条：拆解 → 计划 → 执行 → 报告
+            const stagesDiv = document.createElement('div');
+            stagesDiv.className = 'agent-stages';
+            const stageNames = ['问题差分', '执行计划', '子任务执行', '分析报告'];
+            const stageEls = [];
+            stageNames.forEach((name, i) => {
+                if (i > 0) {
+                    const line = document.createElement('div');
+                    line.className = 'stage-line';
+                    line.dataset.stageLine = i;
+                    stagesDiv.appendChild(line);
+                }
+                const item = document.createElement('div');
+                item.className = 'stage-item';
+                item.innerHTML = `<div class="stage-dot">${i + 1}</div><span>${name}</span>`;
+                stagesDiv.appendChild(item);
+                stageEls.push(item);
+            });
+            card.appendChild(stagesDiv);
+
+            function setStage(index, state) {
+                // state: 'active' | 'done'
+                stageEls.forEach((el, i) => {
+                    el.classList.remove('active', 'done');
+                    if (i < index || (i === index && state === 'done')) el.classList.add('done');
+                    if (i === index && state === 'active') el.classList.add('active');
+                });
+                stagesDiv.querySelectorAll('.stage-line').forEach((line) => {
+                    const li = Number(line.dataset.stageLine);
+                    line.classList.toggle('done', li <= index);
+                });
+            }
+            setStage(0, 'active');
+
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'status thinking';
+            statusDiv.textContent = '正在拆解问题（问题差分）...';
+            card.appendChild(statusDiv);
+
+            // 四个内容区
+            const decomposeSection = document.createElement('div');
+            const planSection = document.createElement('div');
+            const execSection = document.createElement('div');
+            const reportSection = document.createElement('div');
+            card.appendChild(decomposeSection);
+            card.appendChild(planSection);
+            card.appendChild(execSection);
+            card.appendChild(reportSection);
+
+            const stepCards = {};   // step_id -> {root, sqlBox, resultSection, statusEl, body}
+            const startTime = now();
+
+            abortController = new AbortController();
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/agent/stream`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question }),
+                    signal: abortController.signal,
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                await readSSE(response, (eventType, eventData) => {
+                    switch (eventType) {
+                        case 'decompose_done':
+                            renderDecompose(decomposeSection, eventData);
+                            setStage(1, 'active');
+                            statusDiv.textContent = '正在生成执行计划...';
+                            break;
+
+                        case 'plan_done':
+                            renderPlan(planSection, eventData.plan);
+                            setStage(2, 'active');
+                            statusDiv.textContent = '正在执行子任务...';
+                            break;
+
+                        case 'step_start': {
+                            const dom = renderStepCard(execSection, eventData, stepCards);
+                            statusDiv.textContent =
+                                `子任务执行中（${eventData.index}/${eventData.total}）：${eventData.step_name}`;
+                            // 自动滚动到最新步骤
+                            dom.root.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            break;
+                        }
+
+                        case 'step_done':
+                            updateStepCard(stepCards, eventData);
+                            break;
+
+                        case 'summary_done':
+                            setStage(3, 'active');
+                            statusDiv.textContent = '正在生成分析报告...';
+                            renderSummary(reportSection, eventData.summary);
+                            break;
+
+                        case 'report_done':
+                            renderReport(reportSection, eventData.report);
+                            break;
+
+                        case 'done':
+                            setStage(3, 'done');
+                            statusDiv.className = 'status';
+                            statusDiv.textContent =
+                                `分析完成：成功 ${eventData.completed_steps} 步，失败 ${eventData.failed_steps} 步，跳过 ${eventData.skipped_steps} 步，总耗时 ${formatTime(now() - startTime)}`;
+                            break;
+
+                        case 'error':
+                            statusDiv.className = 'status';
+                            statusDiv.textContent = '';
+                            renderError(reportSection, eventData);
+                            break;
+                    }
+                });
+            } catch (e) {
+                if (e.name === 'AbortError') {
+                    statusDiv.className = 'status';
+                    statusDiv.textContent = '已取消分析';
+                } else {
+                    statusDiv.className = 'status';
+                    statusDiv.textContent = '';
+                    renderError(reportSection, { error: e.message, error_type: 'network' });
+                }
+            } finally {
+                resetInput();
             }
         }
 
-        function resetInput() {
-            questionInput.disabled = false;
-            submitBtn.textContent = '查询';
-            submitBtn.classList.remove('cancel');
-            submitBtn.onclick = submitQuery;
-            submitBtn.disabled = false;
-            questionInput.focus();
+        // ==================== 智能路由链路（/api/v1/ask）====================
+        // 事件流 = routing [→ 直接查询事件 | → escalated → 多步分析事件]，按事件类型混合渲染
+        async function runAuto(question, card) {
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'status thinking';
+            statusDiv.textContent = '正在识别问题类型...';
+            card.appendChild(statusDiv);
+
+            // 直接查询用的 SQL 区（按需显示）
+            const sqlSection = document.createElement('div');
+            sqlSection.style.display = 'none';
+            const sqlTitle = document.createElement('div');
+            sqlTitle.className = 'section-title';
+            sqlTitle.textContent = '生成的 SQL';
+            sqlSection.appendChild(sqlTitle);
+            const sqlBox = document.createElement('div');
+            sqlBox.className = 'sql-box';
+            const cursorSpan = document.createElement('span');
+            cursorSpan.className = 'cursor';
+            sqlBox.appendChild(cursorSpan);
+            sqlSection.appendChild(sqlBox);
+            card.appendChild(sqlSection);
+
+            // 直接查询结果区
+            const resultSection = document.createElement('div');
+            card.appendChild(resultSection);
+
+            // 多步分析区（路由到 agent 或自动升级后才显示）
+            const agentWrap = document.createElement('div');
+            agentWrap.style.display = 'none';
+            const decomposeSection = document.createElement('div');
+            const planSection = document.createElement('div');
+            const execSection = document.createElement('div');
+            const reportSection = document.createElement('div');
+            agentWrap.appendChild(decomposeSection);
+            agentWrap.appendChild(planSection);
+            agentWrap.appendChild(execSection);
+            agentWrap.appendChild(reportSection);
+            card.appendChild(agentWrap);
+
+            const stepCards = {};
+            const startTime = now();
+            let fullSql = '';
+            let agentStarted = false;
+
+            abortController = new AbortController();
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question }),
+                    signal: abortController.signal,
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                await readSSE(response, (eventType, eventData) => {
+                    switch (eventType) {
+                        case 'routing': {
+                            const label = eventData.routed_to === 'agent' ? '多步分析' : '直接查询';
+                            statusDiv.textContent = `自动路由 → ${label}：${eventData.reason}`;
+                            break;
+                        }
+
+                        case 'escalated':
+                            statusDiv.textContent = `已自动升级为多步分析：${eventData.reason || ''}`;
+                            break;
+
+                        case 'sql_chunk':
+                            sqlSection.style.display = '';
+                            if (!eventData.content) break;
+                            fullSql += eventData.content;
+                            sqlBox.textContent = fullSql;
+                            sqlBox.appendChild(cursorSpan);
+                            break;
+
+                        case 'sql_done':
+                            sqlSection.style.display = '';
+                            fullSql = eventData.sql || fullSql;
+                            sqlBox.textContent = fullSql;
+                            break;
+
+                        case 'result':
+                            renderResult(resultSection, eventData);
+                            if (!agentStarted) {
+                                statusDiv.className = 'status';
+                                statusDiv.textContent = `查询完成：${eventData.row_count ?? (eventData.rows || []).length} 行，耗时 ${formatTime(now() - startTime)}`;
+                            }
+                            break;
+
+                        case 'decompose_done':
+                            agentStarted = true;
+                            agentWrap.style.display = '';
+                            renderDecompose(decomposeSection, eventData);
+                            statusDiv.textContent = '正在生成执行计划...';
+                            break;
+
+                        case 'plan_done':
+                            renderPlan(planSection, eventData.plan);
+                            statusDiv.textContent = '正在执行子任务...';
+                            break;
+
+                        case 'step_start': {
+                            agentStarted = true;
+                            agentWrap.style.display = '';
+                            const dom = renderStepCard(execSection, eventData, stepCards);
+                            statusDiv.textContent =
+                                `子任务执行中（${eventData.index}/${eventData.total}）：${eventData.step_name}`;
+                            dom.root.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            break;
+                        }
+
+                        case 'step_done':
+                            updateStepCard(stepCards, eventData);
+                            break;
+
+                        case 'summary_done':
+                            renderSummary(reportSection, eventData.summary);
+                            statusDiv.textContent = '正在生成分析报告...';
+                            break;
+
+                        case 'report_done':
+                            renderReport(reportSection, eventData.report);
+                            break;
+
+                        case 'done':
+                            statusDiv.className = 'status';
+                            statusDiv.textContent =
+                                `分析完成：成功 ${eventData.completed_steps} 步，失败 ${eventData.failed_steps} 步，跳过 ${eventData.skipped_steps} 步，总耗时 ${formatTime(now() - startTime)}`;
+                            break;
+
+                        case 'error':
+                            statusDiv.className = 'status';
+                            statusDiv.textContent = '';
+                            renderError(reportSection, eventData);
+                            break;
+                    }
+                });
+            } catch (e) {
+                if (e.name === 'AbortError') {
+                    statusDiv.className = 'status';
+                    statusDiv.textContent = '已取消';
+                } else {
+                    statusDiv.className = 'status';
+                    statusDiv.textContent = '';
+                    renderError(reportSection, { error: e.message, error_type: 'network' });
+                }
+            } finally {
+                resetInput();
+            }
         }
 
-        function renderResult(container, data) {
-            const { columns, rows, row_count } = data;
+        // —— 问题差分（拆解结果）
+        function renderDecompose(container, data) {
+            const goal = data.analysis_goal || '';
+            const subtasks = data.subtasks || [];
+            let html = '<div class="section-title">问题差分</div>';
+            html += `<div class="goal-box"><b>分析目标：</b>${escapeHtml(goal || data.original_question || '')}</div>`;
+            html += '<div class="subtask-list">';
+            for (const t of subtasks) {
+                const deps = (t.depends_on || []).length
+                    ? `<div class="st-meta">依赖：${escapeHtml(t.depends_on.join('、'))}</div>`
+                    : '';
+                const metrics = (t.metrics || []).length
+                    ? `<div class="st-meta">指标：${escapeHtml(t.metrics.join('、'))}</div>`
+                    : '';
+                const dims = (t.dimensions || []).length
+                    ? `<div class="st-meta">维度：${escapeHtml(t.dimensions.join('、'))}</div>`
+                    : '';
+                html += `
+                    <div class="subtask-card">
+                        <div class="st-head">
+                            <span class="st-id">${escapeHtml(t.task_id || '')}</span>
+                            <span class="st-name">${escapeHtml(t.task_name || '')}</span>
+                            <span class="st-type">${escapeHtml(t.task_type || '')}</span>
+                        </div>
+                        <div class="st-desc">${escapeHtml(t.description || '')}</div>
+                        ${deps}${metrics}${dims}
+                    </div>`;
+            }
+            html += '</div>';
+            container.innerHTML = html;
+        }
 
-            // 空结果友好提示
+        // —— 执行计划
+        function renderPlan(container, plan) {
+            const steps = (plan && plan.steps) || [];
+            let html = '<div class="section-title">执行计划</div><div class="plan-steps">';
+            steps.forEach((s, i) => {
+                const dep = (s.depends_on || []).length
+                    ? `依赖 ${escapeHtml(s.depends_on.join('、'))}`
+                    : '无依赖';
+                html += `
+                    <div class="plan-step-row">
+                        <div class="ps-num">${i + 1}</div>
+                        <div class="plan-step-col">
+                            <div><span class="ps-name">${escapeHtml(s.step_name || '')}</span></div>
+                            <div class="ps-exp">预期输出：${escapeHtml(s.expected_output || '-')}</div>
+                        </div>
+                        <div class="ps-dep">${dep}</div>
+                    </div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // —— 子任务执行卡片（step_start 创建，step_done 填充）
+        function renderStepCard(container, data, registry) {
+            const root = document.createElement('div');
+            root.className = 'exec-step running';
+            root.dataset.stepId = data.step_id;
+
+            const head = document.createElement('div');
+            head.className = 'exec-step-head';
+            head.innerHTML = `
+                <span class="es-num">${escapeHtml(data.step_id || '')}</span>
+                <span class="es-name">${escapeHtml(data.step_name || '')}</span>
+                <span class="es-status st-running">执行中</span>
+                <span class="es-toggle">▼</span>
+            `;
+            root.appendChild(head);
+
+            const body = document.createElement('div');
+            body.className = 'exec-step-body';
+
+            const q = document.createElement('div');
+            q.className = 'es-question';
+            q.textContent = data.question || '';
+            body.appendChild(q);
+
+            const sqlTitle = document.createElement('div');
+            sqlTitle.className = 'section-title';
+            sqlTitle.textContent = '生成的 SQL';
+            body.appendChild(sqlTitle);
+
+            const sqlBox = document.createElement('div');
+            sqlBox.className = 'sql-box';
+            sqlBox.textContent = '生成中...';
+            body.appendChild(sqlBox);
+
+            const resultSection = document.createElement('div');
+            body.appendChild(resultSection);
+
+            root.appendChild(body);
+            container.appendChild(root);
+
+            head.addEventListener('click', () => root.classList.toggle('collapsed'));
+
+            registry[data.step_id] = { root, sqlBox, resultSection };
+            return registry[data.step_id];
+        }
+
+        function updateStepCard(registry, result) {
+            const dom = registry[result.step_id];
+            if (!dom) return;
+            const { root, sqlBox, resultSection } = dom;
+
+            root.classList.remove('running');
+            root.classList.add(result.status || (result.success ? 'completed' : 'failed'));
+
+            const statusEl = root.querySelector('.es-status');
+            statusEl.className = 'es-status st-' + (result.status || (result.success ? 'completed' : 'failed'));
+            statusEl.textContent = {
+                completed: '✓ 成功',
+                failed: '✗ 失败',
+                skipped: '已跳过',
+            }[result.status] || (result.success ? '✓ 成功' : '✗ 失败');
+
+            sqlBox.textContent = result.sql || '（无 SQL）';
+
+            if (result.error) {
+                renderError(resultSection, {
+                    error: result.error,
+                    error_type: result.status === 'skipped' ? 'skipped' : 'step_failed',
+                });
+            } else {
+                renderResult(resultSection, {
+                    columns: result.columns || [],
+                    rows: result.rows || [],
+                    row_count: (result.rows || []).length,
+                });
+            }
+        }
+
+        // —— 执行摘要 + 分析报告
+        function renderSummary(container, summary) {
+            let html = '<div class="summary-mini">';
+            html += `<b>执行摘要：</b>${escapeHtml(summary.summary_text || '')}`;
+            if ((summary.key_findings || []).length) {
+                html += '<br><b>关键发现：</b>' + escapeHtml(summary.key_findings.join('；'));
+            }
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function renderReport(container, report) {
+            let html = '<div class="section-title">分析报告</div>';
+            html += '<div class="report-card">';
+            html += `<div class="report-head">📊 ${escapeHtml(report.title || '分析报告')}</div>`;
+            html += '<div class="report-body">';
+
+            html += `<div class="report-summary">${escapeHtml(report.executive_summary || '')}</div>`;
+
+            if ((report.key_findings || []).length) {
+                html += '<div class="report-block"><div class="rb-title">🔍 关键发现</div><ul>';
+                for (const f of report.key_findings) {
+                    html += `<li>${escapeHtml(f)}</li>`;
+                }
+                html += '</ul></div>';
+            }
+
+            if ((report.root_causes || []).length) {
+                html += '<div class="report-block root"><div class="rb-title">🧩 根因分析</div><ul>';
+                for (const r of report.root_causes) {
+                    html += `<li>${escapeHtml(r)}</li>`;
+                }
+                html += '</ul></div>';
+            }
+
+            if (report.trend_judgment) {
+                html += `<div class="trend-box"><b>趋势判断：</b>${escapeHtml(report.trend_judgment)}</div>`;
+            }
+
+            if ((report.action_suggestions || []).length) {
+                html += '<div class="report-block action" style="margin-top:14px;"><div class="rb-title">✅ 行动建议</div><ul>';
+                for (const a of report.action_suggestions) {
+                    html += `<li>${escapeHtml(a)}</li>`;
+                }
+                html += '</ul></div>';
+            }
+
+            if (report.markdown) {
+                html += `<div class="report-md"><details><summary>查看完整 Markdown 报告</summary><pre>${escapeHtml(report.markdown)}</pre></details></div>`;
+            }
+
+            html += '</div></div>';
+            container.innerHTML = html;
+        }
+
+        // ==================== 公共渲染 ====================
+        function renderResult(container, data) {
+            const { columns, rows, row_count, metadata } = data;
+            const truncated = Boolean(data.truncated || (metadata && metadata.db_truncated));
+
             if (!rows || rows.length === 0) {
                 container.innerHTML = `
                     <div class="empty-result">
@@ -531,6 +1415,9 @@
             }
 
             let html = '<div class="section-title" style="margin-top: 8px;">查询结果</div>';
+            if (truncated) {
+                html += '<div class="row-count" style="color:#c0392b;font-weight:600;">⚠ 结果已截断（达到返回行数上限），仅显示前 ' + (row_count ?? rows.length) + ' 行</div>';
+            }
             html += '<div class="result-table-wrapper"><table class="result-table"><thead><tr>';
             for (const col of columns) {
                 html += `<th>${escapeHtml(col)}</th>`;
@@ -544,7 +1431,7 @@
                 html += '</tr>';
             }
             html += '</tbody></table></div>';
-            html += `<div class="row-count">共 ${row_count} 行</div>`;
+            html += `<div class="row-count">共 ${row_count ?? rows.length} 行</div>`;
 
             container.innerHTML = html;
         }
@@ -555,6 +1442,9 @@
                 'llm': 'LLM 调用失败',
                 'database': 'SQL 执行错误',
                 'network': '网络错误',
+                'step_failed': '子任务执行失败',
+                'skipped': '子任务已跳过',
+                'agent': 'Agent 链路异常',
             };
             const label = typeLabels[data.error_type] || data.error_type || '未知错误';
 

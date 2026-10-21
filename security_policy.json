@@ -1,0 +1,42 @@
+{
+  "allowed_tables": [
+    "dim_stores",
+    "dim_products",
+    "exchange_rates",
+    "amz_order_items",
+    "amz_ads_daily",
+    "amz_traffic_daily",
+    "amz_fba_inventory",
+    "amz_settlement",
+    "amz_returns"
+  ],
+  "forbidden_schemas": [
+    "information_schema",
+    "mysql",
+    "performance_schema",
+    "sys"
+  ],
+  "forbidden_functions": [
+    "SLEEP",
+    "BENCHMARK",
+    "LOAD_FILE",
+    "GET_LOCK",
+    "RELEASE_LOCK",
+    "UUID_SHORT"
+  ],
+  "restricted_columns": {
+    "dim_products": ["unit_cost", "head_freight_cost"]
+  },
+  "masked_columns": ["customer_phone", "customer_email"],
+  "row_level_tables": [
+    "dim_stores",
+    "dim_products",
+    "amz_order_items",
+    "amz_ads_daily",
+    "amz_traffic_daily",
+    "amz_fba_inventory",
+    "amz_settlement",
+    "amz_returns"
+  ],
+  "row_level_column": "store_id"
+}

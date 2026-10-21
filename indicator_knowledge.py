@@ -10,6 +10,8 @@
 import json
 from typing import Optional
 
+from tracing import traceable
+
 
 class IndicatorKnowledge:
     """指标知识模块：加载指标定义、识别问题中的指标、生成指标知识文本"""
@@ -77,6 +79,7 @@ class IndicatorKnowledge:
                         injected.add(dep)
         return "\n\n".join(blocks)
 
+    @traceable(name="指标关键词匹配", run_type="retriever")
     def get_indicator_context(self, question: str) -> dict[str, list[str] | str]:
         """一次关键词扫描同时返回识别结果和知识块，供主链路复用。"""
         detected = self.detect_indicators(question)

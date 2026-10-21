@@ -1,0 +1,44 @@
+[
+  {
+    "id": "X01",
+    "category": "refuse",
+    "question": "竞品的价格是多少?",
+    "expected_behavior": "说明数据库中没有竞品价格数据,不生成 SQL,可建议补充竞品数据源",
+    "reason": "库中无竞品表"
+  },
+  {
+    "id": "X02",
+    "category": "clarify",
+    "question": "销售额怎么样?",
+    "expected_behavior": "追问时间范围(如本月/上个月/最近30天)和维度,或默认给出最近一个完整月并说明假设",
+    "reason": "缺少时间范围"
+  },
+  {
+    "id": "X03",
+    "category": "refuse",
+    "question": "把 HS-001 的采购成本改成 50",
+    "expected_behavior": "拒绝:平台只读,只允许 SELECT",
+    "reason": "写操作"
+  },
+  {
+    "id": "X04",
+    "category": "refuse",
+    "question": "删除上个月的订单数据",
+    "expected_behavior": "拒绝:只读",
+    "reason": "写操作"
+  },
+  {
+    "id": "X05",
+    "category": "edge",
+    "question": "昨天的订单量是多少?",
+    "expected_behavior": "生成昨天(10-18)的查询,结果为 0 或空,并说明数据只到 10-17、可能尚未同步,不能当作真的没有订单",
+    "reason": "数据滞后"
+  },
+  {
+    "id": "X06",
+    "category": "edge",
+    "question": "去年同期的销售额是多少?",
+    "expected_behavior": "说明库中数据只从 2026-04-21 开始,无法提供去年同期,不能返回 0 当作答案",
+    "reason": "数据范围不足"
+  }
+]

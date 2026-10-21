@@ -1,0 +1,1079 @@
+[
+ {
+  "id": "T01",
+  "category": "time",
+  "question": "上个月卖了多少钱?",
+  "expected_sql": "SELECT SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND o.purchase_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')",
+  "generated_sql": "SELECT\n    SUM(o.item_amount * r.rate_to_cny) AS sales_cny\nFROM amz_order_items o\nJOIN exchange_rates r\n  ON o.purchase_date = r.rate_date\n AND o.currency = r.currency\nWHERE o.order_status NOT IN ('Canceled', 'Pending')\n  AND o.purchase_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')\n  AND o.purchase_date < DATE_FORMAT(CURDATE(), '%Y-%m-01');",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "sales_cny"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "sales_cny"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "上个月为 9 月整月,不是最近 30 天",
+   "排除 Canceled/Pending",
+   "item_amount 不含税,按下单日汇率折算"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "sales_cny"
+   ],
+   "rows": [
+    [
+     431067.2359
+    ]
+   ]
+  }
+ },
+ {
+  "id": "T02",
+  "category": "time",
+  "question": "9月的GMV是多少?",
+  "expected_sql": "SELECT SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= '2026-09-01' AND o.purchase_date < '2026-10-01'",
+  "generated_sql": "SELECT\n    COALESCE(SUM(o.item_amount * r.rate_to_cny), 0) AS gmv_cny\nFROM amz_order_items o\nJOIN exchange_rates r\n  ON o.purchase_date = r.rate_date\n AND o.currency = r.currency\nWHERE o.order_status NOT IN ('Canceled', 'Pending')\n  AND o.purchase_date >= CASE\n        WHEN MONTH(CURDATE()) < 9\n            THEN DATE_ADD(MAKEDATE(YEAR(CURDATE()) - 1, 1), INTERVAL 8 MONTH)\n        ELSE DATE_ADD(MAKEDATE(YEAR(CURDATE()), 1), INTERVAL 8 MONTH)\n    END\n  AND o.purchase_date < CASE\n        WHEN MONTH(CURDATE()) < 9\n            THEN DATE_ADD(MAKEDATE(YEAR(CURDATE()) - 1, 1), INTERVAL 9 MONTH)\n        ELSE DATE_ADD(MAKEDATE(YEAR(CURDATE()), 1), INTERVAL 9 MONTH)\n    END;",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "sales_cny"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "gmv_cny"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "GMV 映射到销售额",
+   "未写年份默认今年"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "sales_cny"
+   ],
+   "rows": [
+    [
+     431067.2359
+    ]
+   ]
+  }
+ },
+ {
+  "id": "T03",
+  "category": "time",
+  "question": "最近7天的销售额是多少?",
+  "expected_sql": "SELECT SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND o.purchase_date < CURDATE()",
+  "generated_sql": "SELECT\n    SUM(o.item_amount * r.rate_to_cny) AS sales_cny\nFROM amz_order_items o\nJOIN exchange_rates r\n  ON o.purchase_date = r.rate_date\n AND o.currency = r.currency\nWHERE o.order_status NOT IN ('Canceled', 'Pending')\n  AND o.purchase_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)\n  AND o.purchase_date < CURDATE();",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "sales_cny"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "sales_cny"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "最近7天=10-12 至 10-18,不含今天",
+   "与『上周』区别"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "sales_cny"
+   ],
+   "rows": [
+    [
+     70104.3559
+    ]
+   ]
+  }
+ },
+ {
+  "id": "T04",
+  "category": "time",
+  "question": "上周的销售额是多少?",
+  "expected_sql": "SELECT SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 7 DAY) AND o.purchase_date < DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)",
+  "generated_sql": "SELECT\n    SUM(o.item_amount * r.rate_to_cny) AS sales_cny\nFROM amz_order_items o\nJOIN exchange_rates r\n  ON o.purchase_date = r.rate_date\n AND o.currency = r.currency\nWHERE o.order_status NOT IN ('Canceled', 'Pending')\n  AND o.purchase_date >= DATE_SUB(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 7 DAY)\n  AND o.purchase_date < DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY);",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "sales_cny"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "sales_cny"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "今天是周一,上周为 10-12 至 10-18",
+   "使用 WEEKDAY 计算周一"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "sales_cny"
+   ],
+   "rows": [
+    [
+     70104.3559
+    ]
+   ]
+  }
+ },
+ {
+  "id": "T05",
+  "category": "time",
+  "question": "本月客单价是多少?",
+  "expected_sql": "SELECT SUM(o.item_amount * r.rate_to_cny) / NULLIF(COUNT(DISTINCT o.order_id), 0) AS aov_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND o.purchase_date <= CURDATE()",
+  "generated_sql": "SELECT\n    SUM(o.item_amount * r.rate_to_cny) / NULLIF(COUNT(DISTINCT o.order_id), 0) AS avg_order_value_cny\nFROM amz_order_items o\nJOIN exchange_rates r\n  ON o.purchase_date = r.rate_date\n AND o.currency = r.currency\nWHERE o.order_status NOT IN ('Canceled', 'Pending')\n  AND o.purchase_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')\n  AND o.purchase_date <= CURDATE();",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "aov_cny"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "avg_order_value_cny"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "分母是订单数去重,不是行数",
+   "本月只到 10-17(数据截止)"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "aov_cny"
+   ],
+   "rows": [
+    [
+     264.12
+    ]
+   ]
+  }
+ },
+ {
+  "id": "S01",
+  "category": "sales",
+  "question": "上个月订单量是多少?",
+  "expected_sql": "SELECT COUNT(DISTINCT o.order_id) AS order_cnt FROM amz_order_items o WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND o.purchase_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')",
+  "generated_sql": "SELECT\n    COUNT(DISTINCT order_id) AS order_count\nFROM amz_order_items\nWHERE order_status NOT IN ('Canceled', 'Pending')\n  AND purchase_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')\n  AND purchase_date < DATE_FORMAT(CURDATE(), '%Y-%m-01');",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "order_cnt"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "order_count"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "COUNT(DISTINCT order_id),不能 COUNT(*)",
+   "排除取消和待处理订单"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "order_cnt"
+   ],
+   "rows": [
+    [
+     1658.0
+    ]
+   ]
+  }
+ },
+ {
+  "id": "S02",
+  "category": "sales",
+  "question": "各国家上个月销售额排名",
+  "expected_sql": "SELECT s.marketplace, SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency JOIN dim_stores s ON o.store_id = s.store_id WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND o.purchase_date < DATE_FORMAT(CURDATE(), '%Y-%m-01') GROUP BY s.marketplace ORDER BY sales_cny DESC",
+  "generated_sql": "SELECT\n    s.marketplace,\n    SUM(o.item_amount * r.rate_to_cny) AS sales_cny\nFROM amz_order_items o\nJOIN dim_stores s\n    ON o.store_id = s.store_id\nJOIN exchange_rates r\n    ON o.purchase_date = r.rate_date\n   AND o.currency = r.currency\nWHERE o.order_status NOT IN ('Canceled', 'Pending')\n  AND o.purchase_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')\n  AND o.purchase_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')\nGROUP BY s.marketplace\nORDER BY sales_cny DESC;",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "marketplace",
+    "sales_cny"
+   ],
+   "expected_row_count": 4,
+   "generated_columns": [
+    "marketplace",
+    "sales_cny"
+   ],
+   "generated_row_count": 4
+  },
+  "check_points": [
+   "国家用 dim_stores.marketplace",
+   "必须折算人民币再排序,不能直接相加原币"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "marketplace",
+    "sales_cny"
+   ],
+   "rows": [
+    [
+     "US",
+     204879.0418
+    ],
+    [
+     "UK",
+     99768.63
+    ],
+    [
+     "DE",
+     78121.2667
+    ],
+    [
+     "CA",
+     48298.2974
+    ]
+   ]
+  }
+ },
+ {
+  "id": "S03",
+  "category": "sales",
+  "question": "销售额最高的10个商品(ASIN)",
+  "expected_sql": "SELECT o.asin, SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending') GROUP BY o.asin ORDER BY sales_cny DESC LIMIT 10",
+  "generated_sql": "SELECT\n    o.asin,\n    SUM(o.item_amount * r.rate_to_cny) AS sales_cny\nFROM amz_order_items o\nJOIN exchange_rates r\n    ON o.purchase_date = r.rate_date\n   AND o.currency = r.currency\nWHERE o.order_status NOT IN ('Canceled', 'Pending')\n  AND o.asin IS NOT NULL\nGROUP BY o.asin\nORDER BY sales_cny DESC\nLIMIT 10;",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "asin",
+    "sales_cny"
+   ],
+   "expected_row_count": 10,
+   "generated_columns": [
+    "asin",
+    "sales_cny"
+   ],
+   "generated_row_count": 10
+  },
+  "check_points": [
+   "按 ASIN 分组",
+   "LIMIT 10"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "asin",
+    "sales_cny"
+   ],
+   "rows": [
+    [
+     "B0VPG4ASB4",
+     149218.3073
+    ],
+    [
+     "B0Z54PVBZ0",
+     140291.2141
+    ],
+    [
+     "B0Z1ZFGA63",
+     129898.4997
+    ],
+    [
+     "B0Q1X4ZTX2",
+     127206.4864
+    ],
+    [
+     "B0TDCCQ7BN",
+     124337.0238
+    ],
+    [
+     "B01A38Y2QV",
+     110618.0801
+    ],
+    [
+     "B0ZS3U9W2Y",
+     101320.5828
+    ],
+    [
+     "B021XUBXFN",
+     78689.3679
+    ],
+    [
+     "B0RA78X5F0",
+     73112.7557
+    ],
+    [
+     "B03KAMUMVY",
+     69044.414
+    ]
+   ]
+  }
+ },
+ {
+  "id": "S04",
+  "category": "sales",
+  "question": "上个月人民币毛利率是多少?",
+  "expected_sql": "SELECT (SUM(o.item_amount * r.rate_to_cny) - SUM((p.unit_cost + p.head_freight_cost) * o.quantity)) / NULLIF(SUM(o.item_amount * r.rate_to_cny), 0) * 100 AS gross_margin_pct FROM amz_order_items o JOIN dim_products p ON o.store_id = p.store_id AND o.msku = p.msku JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND o.purchase_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')",
+  "generated_sql": "SELECT\n  (\n    SUM(o.item_amount * r.rate_to_cny)\n    - SUM((p.unit_cost + p.head_freight_cost) * o.quantity)\n  ) / NULLIF(SUM(o.item_amount * r.rate_to_cny), 0) * 100 AS gross_margin_pct\nFROM amz_order_items o\nJOIN exchange_rates r\n  ON o.purchase_date = r.rate_date\n AND o.currency = r.currency\nJOIN dim_products p\n  ON o.store_id = p.store_id\n AND o.msku = p.msku\nWHERE o.order_status NOT IN ('Canceled', 'Pending')\n  AND o.purchase_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')\n  AND o.purchase_date < DATE_FORMAT(CURDATE(), '%Y-%m-01');",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "gross_margin_pct"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "gross_margin_pct"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "成本=(unit_cost+head_freight_cost)×销量",
+   "不扣平台费用、广告费"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "gross_margin_pct"
+   ],
+   "rows": [
+    [
+     60.3068
+    ]
+   ]
+  }
+ },
+ {
+  "id": "A01",
+  "category": "ads",
+  "question": "上个月广告花费是多少?",
+  "expected_sql": "SELECT SUM(a.spend * r.rate_to_cny) AS ad_spend_cny FROM amz_ads_daily a JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency  WHERE a.report_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND a.report_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')",
+  "generated_sql": "SELECT\n    SUM(a.spend * r.rate_to_cny) AS ad_spend_cny\nFROM amz_ads_daily a\nJOIN exchange_rates r\n  ON a.report_date = r.rate_date\n AND a.currency = r.currency\nWHERE a.report_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')\n  AND a.report_date < DATE_FORMAT(CURDATE(), '%Y-%m-01');",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "ad_spend_cny"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "ad_spend_cny"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "用 spend 折算人民币",
+   "不加结算表里的广告扣费"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "ad_spend_cny"
+   ],
+   "rows": [
+    [
+     36626.5106
+    ]
+   ]
+  }
+ },
+ {
+  "id": "A02",
+  "category": "ads",
+  "question": "上个月的ROAS是多少?",
+  "expected_sql": "SELECT SUM(a.sales_7d * r.rate_to_cny) / NULLIF(SUM(a.spend * r.rate_to_cny), 0) AS roas FROM amz_ads_daily a JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency  WHERE a.report_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND a.report_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')",
+  "generated_sql": "SELECT\n    SUM(a.sales_7d * r.rate_to_cny) / NULLIF(SUM(a.spend * r.rate_to_cny), 0) AS roas\nFROM amz_ads_daily a\nJOIN exchange_rates r\n  ON a.report_date = r.rate_date\n AND a.currency = r.currency\nWHERE a.report_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')\n  AND a.report_date < DATE_FORMAT(CURDATE(), '%Y-%m-01');",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "roas"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "roas"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "先汇总再相除",
+   "是倍数不是百分比"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "roas"
+   ],
+   "rows": [
+    [
+     3.663
+    ]
+   ]
+  }
+ },
+ {
+  "id": "A03",
+  "category": "ads",
+  "question": "上个月的ACOS是多少?",
+  "expected_sql": "SELECT SUM(a.spend * r.rate_to_cny) / NULLIF(SUM(a.sales_7d * r.rate_to_cny), 0) * 100 AS acos_pct FROM amz_ads_daily a JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency  WHERE a.report_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND a.report_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')",
+  "generated_sql": "SELECT\n    SUM(a.spend * r.rate_to_cny) / NULLIF(SUM(a.sales_7d * r.rate_to_cny), 0) * 100 AS acos_pct\nFROM amz_ads_daily a\nJOIN exchange_rates r\n  ON a.report_date = r.rate_date\n AND a.currency = r.currency\nWHERE a.report_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')\n  AND a.report_date < DATE_FORMAT(CURDATE(), '%Y-%m-01');",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "acos_pct"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "acos_pct"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "先汇总再相除,不能平均每行 ACOS"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "acos_pct"
+   ],
+   "rows": [
+    [
+     27.2997
+    ]
+   ]
+  }
+ },
+ {
+  "id": "A04",
+  "category": "ads",
+  "question": "上个月的TACOS是多少?",
+  "expected_sql": "SELECT ad.ad_spend_cny / NULLIF(s.sales_cny, 0) * 100 AS tacos_pct FROM (SELECT SUM(a.spend * r.rate_to_cny) AS ad_spend_cny FROM amz_ads_daily a JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency  WHERE a.report_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND a.report_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')) ad CROSS JOIN (SELECT SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND o.purchase_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')) s",
+  "generated_sql": "WITH ad_spend AS (\n    SELECT\n        SUM(a.spend * r.rate_to_cny) AS ad_spend_cny\n    FROM amz_ads_daily a\n    JOIN exchange_rates r\n        ON a.report_date = r.rate_date\n       AND a.currency = r.currency\n    WHERE a.report_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')\n      AND a.report_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')\n),\nsales AS (\n    SELECT\n        SUM(o.item_amount * r.rate_to_cny) AS sales_cny\n    FROM amz_order_items o\n    JOIN exchange_rates r\n        ON o.purchase_date = r.rate_date\n       AND o.currency = r.currency\n    WHERE o.order_status NOT IN ('Canceled', 'Pending')\n      AND o.purchase_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')\n      AND o.purchase_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')\n)\nSELECT\n    ad.ad_spend_cny / NULLIF(sa.sales_cny, 0) * 100 AS tacos_pct\nFROM ad_spend ad\nCROSS JOIN sales sa;",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "tacos_pct"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "tacos_pct"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "时间条件要加在两个子查询里",
+   "不能直接 JOIN 两张明细表"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "tacos_pct"
+   ],
+   "rows": [
+    [
+     8.4967
+    ]
+   ]
+  }
+ },
+ {
+  "id": "A05",
+  "category": "ads",
+  "question": "UK站点上个月的广告点击率是多少?",
+  "expected_sql": "SELECT SUM(a.clicks) / NULLIF(SUM(a.impressions), 0) * 100 AS ctr_pct FROM amz_ads_daily a JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency JOIN dim_stores s ON a.store_id = s.store_id WHERE s.marketplace = 'UK' AND a.report_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND a.report_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')",
+  "generated_sql": "SELECT\n    SUM(a.clicks) / NULLIF(SUM(a.impressions), 0) * 100 AS ad_ctr_pct\nFROM amz_ads_daily a\nJOIN dim_stores s\n    ON a.store_id = s.store_id\nWHERE s.marketplace = 'UK'\n  AND a.report_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')\n  AND a.report_date < DATE_FORMAT(CURDATE(), '%Y-%m-01');",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "ctr_pct"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "ad_ctr_pct"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "UK 用 dim_stores.marketplace='UK'",
+   "点击率不需要汇率,多余的汇率 JOIN 不影响结果"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "ctr_pct"
+   ],
+   "rows": [
+    [
+     0.5334
+    ]
+   ]
+  }
+ },
+ {
+  "id": "F01",
+  "category": "traffic",
+  "question": "本月Buy Box占比是多少?",
+  "expected_sql": "SELECT SUM(t.buy_box_pct * t.sessions) / NULLIF(SUM(t.sessions), 0) AS buy_box_pct FROM amz_traffic_daily t WHERE t.report_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND t.report_date <= CURDATE()",
+  "generated_sql": "SELECT\n    SUM(buy_box_pct * sessions) / NULLIF(SUM(sessions), 0) AS buy_box_pct\nFROM amz_traffic_daily\nWHERE report_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')\n  AND report_date <= CURDATE();",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "buy_box_pct"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "buy_box_pct"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "不能直接 AVG(buy_box_pct)"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "buy_box_pct"
+   ],
+   "rows": [
+    [
+     94.5519
+    ]
+   ]
+  }
+ },
+ {
+  "id": "F02",
+  "category": "traffic",
+  "question": "本月转化率是多少?",
+  "expected_sql": "SELECT SUM(t.units_ordered) / NULLIF(SUM(t.sessions), 0) * 100 AS session_cvr_pct FROM amz_traffic_daily t WHERE t.report_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND t.report_date <= CURDATE()",
+  "generated_sql": "SELECT\n    SUM(t.units_ordered) / NULLIF(SUM(t.sessions), 0) * 100 AS conversion_rate_pct\nFROM amz_traffic_daily t\nWHERE t.report_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')\n  AND t.report_date <= CURDATE();",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "session_cvr_pct"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "conversion_rate_pct"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "用流量表 units_ordered/sessions",
+   "不用订单表销量,也不用广告订单"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "session_cvr_pct"
+   ],
+   "rows": [
+    [
+     7.6437
+    ]
+   ]
+  }
+ },
+ {
+  "id": "F03",
+  "category": "traffic",
+  "question": "宠物用品最近30天的会话数是多少?",
+  "expected_sql": "SELECT SUM(t.sessions) AS sessions FROM amz_traffic_daily t JOIN (SELECT DISTINCT store_id, asin FROM dim_products WHERE category = '宠物用品') p ON t.store_id = p.store_id AND t.asin = p.asin WHERE t.report_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND t.report_date < CURDATE()",
+  "generated_sql": "SELECT\n    SUM(t.sessions) AS sessions\nFROM amz_traffic_daily t\nWHERE t.report_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)\n  AND t.report_date < CURDATE()\n  AND EXISTS (\n      SELECT 1\n      FROM dim_products p\n      WHERE p.store_id = t.store_id\n        AND p.asin = t.asin\n        AND p.category = '宠物用品'\n  );",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "sessions"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "sessions"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "dim_products 先按 (store_id, asin) 去重再关联,否则会话数被放大"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "sessions"
+   ],
+   "rows": [
+    [
+     5322.0
+    ]
+   ]
+  }
+ },
+ {
+  "id": "I01",
+  "category": "inventory",
+  "question": "现在库存还能卖几天?",
+  "expected_sql": "SELECT inv.available_units / NULLIF(sl.units_30d / 30, 0) AS days_of_supply FROM (SELECT SUM(i.available_qty) AS available_units FROM amz_fba_inventory i WHERE i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)) inv CROSS JOIN (SELECT SUM(o.quantity) AS units_30d FROM amz_order_items o WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) sl",
+  "generated_sql": "WITH inventory_latest AS (\n    SELECT SUM(available_qty) AS fba_available_qty\n    FROM amz_fba_inventory\n    WHERE snapshot_date = (\n        SELECT MAX(snapshot_date)\n        FROM amz_fba_inventory\n    )\n),\nsales_30d AS (\n    SELECT SUM(quantity) AS units_last_30d\n    FROM amz_order_items\n    WHERE order_status NOT IN ('Canceled', 'Pending')\n      AND purchase_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)\n      AND purchase_date < CURDATE()\n)\nSELECT\n    i.fba_available_qty / NULLIF(s.units_last_30d / 30.0, 0) AS sellable_days\nFROM inventory_latest i\nCROSS JOIN sales_30d s;",
+  "exact_match": false,
+  "execution_match": false,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "days_of_supply"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "sellable_days"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "库存取最新快照日期",
+   "销量窗口近 30 天"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "days_of_supply"
+   ],
+   "rows": [
+    [
+     52.5643
+    ]
+   ]
+  }
+ },
+ {
+  "id": "I02",
+  "category": "inventory",
+  "question": "老库存占比多少?",
+  "expected_sql": "SELECT SUM(i.age_181_270_qty + i.age_271_365_qty + i.age_365_plus_qty) / NULLIF(SUM(i.age_0_90_qty + i.age_91_180_qty + i.age_181_270_qty + i.age_271_365_qty + i.age_365_plus_qty), 0) * 100 AS aged_stock_pct FROM amz_fba_inventory i WHERE i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)",
+  "generated_sql": "SELECT\n    SUM(age_181_270_qty + age_271_365_qty + age_365_plus_qty) * 100.0 /\n    NULLIF(SUM(age_0_90_qty + age_91_180_qty + age_181_270_qty + age_271_365_qty + age_365_plus_qty), 0) AS aged_inventory_ratio_pct\nFROM amz_fba_inventory\nWHERE snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory);",
+  "exact_match": false,
+  "execution_match": false,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "aged_stock_pct"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "aged_inventory_ratio_pct"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "181-270、271-365、365+ 三段之和",
+   "只取最新快照"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "aged_stock_pct"
+   ],
+   "rows": [
+    [
+     23.0456
+    ]
+   ]
+  }
+ },
+ {
+  "id": "I03",
+  "category": "inventory",
+  "question": "当前FBA可售库存是多少件?",
+  "expected_sql": "SELECT SUM(i.available_qty) AS available_units FROM amz_fba_inventory i WHERE i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)",
+  "generated_sql": "SELECT SUM(available_qty) AS available_qty\nFROM amz_fba_inventory\nWHERE snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory);",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "available_units"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "available_qty"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "只取最大 snapshot_date"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "available_units"
+   ],
+   "rows": [
+    [
+     3881.0
+    ]
+   ]
+  }
+ },
+ {
+  "id": "P01",
+  "category": "settlement",
+  "question": "本月平台费用是多少?",
+  "expected_sql": "SELECT -SUM(s.amount * r.rate_to_cny) AS fee_cny FROM amz_settlement s JOIN exchange_rates r ON s.posted_date = r.rate_date AND s.currency = r.currency WHERE s.fee_type IN ('commission', 'fba_fee', 'storage_fee') AND s.posted_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND s.posted_date <= CURDATE()",
+  "generated_sql": "SELECT\n    -SUM(s.amount * r.rate_to_cny) AS platform_fee_cny\nFROM amz_settlement s\nJOIN exchange_rates r\n    ON s.posted_date = r.rate_date\n   AND s.currency = r.currency\nWHERE s.fee_type IN ('commission', 'fba_fee', 'storage_fee')\n  AND s.posted_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')\n  AND s.posted_date <= CURDATE();",
+  "exact_match": false,
+  "execution_match": false,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "fee_cny"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "platform_fee_cny"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "只含 commission、fba_fee、storage_fee",
+   "费用为负数,取反",
+   "按入账日期 posted_date"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "fee_cny"
+   ],
+   "rows": [
+    [
+     81987.8866
+    ]
+   ]
+  }
+ },
+ {
+  "id": "P02",
+  "category": "profit",
+  "question": "这个月赚了多少钱?",
+  "expected_sql": "SELECT COALESCE(s.sales_cny, 0) - COALESCE(c.cogs_cny, 0) - COALESCE(f.fee_cny, 0) - COALESCE(ad.ad_spend_cny, 0) AS profit_cny FROM (SELECT SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND o.purchase_date <= CURDATE()) s CROSS JOIN (SELECT SUM((p.unit_cost + p.head_freight_cost) * o.quantity) AS cogs_cny FROM amz_order_items o JOIN dim_products p ON o.store_id = p.store_id AND o.msku = p.msku WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND o.purchase_date <= CURDATE()) c CROSS JOIN (SELECT -SUM(s.amount * r.rate_to_cny) AS fee_cny FROM amz_settlement s JOIN exchange_rates r ON s.posted_date = r.rate_date AND s.currency = r.currency WHERE s.fee_type IN ('commission', 'fba_fee', 'storage_fee') AND s.posted_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND s.posted_date <= CURDATE()) f CROSS JOIN (SELECT SUM(a.spend * r.rate_to_cny) AS ad_spend_cny FROM amz_ads_daily a JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency  WHERE a.report_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND a.report_date <= CURDATE()) ad",
+  "generated_sql": "WITH order_metrics AS (\n    SELECT\n        COALESCE(SUM(o.item_amount * r.rate_to_cny), 0) AS sales_cny,\n        COALESCE(SUM((p.unit_cost + p.head_freight_cost) * o.quantity), 0) AS product_cost_cny\n    FROM amz_order_items o\n    JOIN exchange_rates r\n        ON o.purchase_date = r.rate_date\n       AND o.currency = r.currency\n    LEFT JOIN dim_products p\n        ON o.store_id = p.store_id\n       AND o.msku = p.msku\n    WHERE o.order_status NOT IN ('Canceled', 'Pending')\n      AND o.purchase_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')\n      AND o.purchase_date <= CURDATE()\n),\nplatform_fee_metrics AS (\n    SELECT\n        COALESCE(SUM(-s.amount * r.rate_to_cny), 0) AS platform_fee_cny\n    FROM amz_settlement s\n    JOIN exchange_rates r\n        ON s.posted_date = r.rate_date\n       AND s.currency = r.currency\n    WHERE s.fee_type IN ('commission', 'fba_fee', 'storage_fee')\n      AND s.posted_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')\n      AND s.posted_date <= CURDATE()\n),\nad_metrics AS (\n    SELECT\n        COALESCE(SUM(a.spend * r.rate_to_cny), 0) AS ad_spend_cny\n    FROM amz_ads_daily a\n    JOIN exchange_rates r\n        ON a.report_date = r.rate_date\n       AND a.currency = r.currency\n    WHERE a.report_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')\n      AND a.report_date <= CURDATE()\n)\nSELECT\n    om.sales_cny - om.product_cost_cny - pf.platform_fee_cny - am.ad_spend_cny AS profit_cny\nFROM order_metrics om\nCROSS JOIN platform_fee_metrics pf\nCROSS JOIN ad_metrics am;",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "profit_cny"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "profit_cny"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "利润=销售额-商品成本-平台费用-广告花费",
+   "四块分别聚合,时间条件加在每个子查询里",
+   "结算和广告用各自的日期字段"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "profit_cny"
+   ],
+   "rows": [
+    [
+     37802.3138
+    ]
+   ]
+  }
+ },
+ {
+  "id": "R01",
+  "category": "returns",
+  "question": "哪个品类的退货率最高?",
+  "expected_sql": "SELECT sl.category, COALESCE(rt.return_units, 0) / NULLIF(sl.units, 0) * 100 AS return_rate_pct FROM (SELECT p.category, SUM(o.quantity) AS units FROM amz_order_items o JOIN dim_products p ON o.store_id = p.store_id AND o.msku = p.msku WHERE o.order_status NOT IN ('Canceled', 'Pending') GROUP BY p.category) sl LEFT JOIN (SELECT p.category, SUM(x.quantity) AS return_units FROM amz_returns x JOIN dim_products p ON x.store_id = p.store_id AND x.msku = p.msku GROUP BY p.category) rt ON sl.category = rt.category ORDER BY return_rate_pct DESC LIMIT 1",
+  "generated_sql": "WITH sales AS (\n    SELECT\n        p.category,\n        SUM(o.quantity) AS units_sold\n    FROM amz_order_items o\n    JOIN dim_products p\n        ON o.store_id = p.store_id\n       AND o.msku = p.msku\n    WHERE o.order_status NOT IN ('Canceled', 'Pending')\n      AND p.category IS NOT NULL\n    GROUP BY p.category\n),\nreturns AS (\n    SELECT\n        p.category,\n        SUM(r.quantity) AS units_returned\n    FROM amz_returns r\n    JOIN dim_products p\n        ON r.store_id = p.store_id\n       AND r.msku = p.msku\n    WHERE p.category IS NOT NULL\n    GROUP BY p.category\n)\nSELECT\n    s.category,\n    COALESCE(r.units_returned, 0) / NULLIF(s.units_sold, 0) * 100 AS return_rate_pct\nFROM sales s\nLEFT JOIN returns r\n    ON s.category = r.category\nWHERE s.units_sold > 0\nORDER BY return_rate_pct DESC\nLIMIT 1;",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "category",
+    "return_rate_pct"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "category",
+    "return_rate_pct"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "分子分母分别聚合再关联",
+   "不要把 amz_returns 直接 JOIN 订单明细(会放大)"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "category",
+    "return_rate_pct"
+   ],
+   "rows": [
+    [
+     "户外运动",
+     5.2386
+    ]
+   ]
+  }
+ },
+ {
+  "id": "R02",
+  "category": "returns",
+  "question": "退货原因分布是怎样的?",
+  "expected_sql": "SELECT reason, SUM(quantity) AS return_units FROM amz_returns GROUP BY reason ORDER BY return_units DESC",
+  "generated_sql": "SELECT\n    reason,\n    COUNT(DISTINCT order_id) AS return_order_count,\n    SUM(quantity) AS return_units\nFROM amz_returns r\nWHERE EXISTS (\n    SELECT 1\n    FROM amz_order_items o\n    WHERE o.order_id = r.order_id\n      AND o.msku = r.msku\n      AND o.order_status NOT IN ('Canceled', 'Pending')\n)\nGROUP BY reason\nORDER BY return_units DESC;",
+  "exact_match": false,
+  "execution_match": false,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "reason",
+    "return_units"
+   ],
+   "expected_row_count": 7,
+   "generated_columns": [
+    "reason",
+    "return_order_count",
+    "return_units"
+   ],
+   "generated_row_count": 7
+  },
+  "check_points": [
+   "reason 枚举值",
+   "按退货件数求和"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "reason",
+    "return_units"
+   ],
+   "rows": [
+    [
+     "DEFECTIVE",
+     84.0
+    ],
+    [
+     "WRONG_ITEM",
+     82.0
+    ],
+    [
+     "QUALITY_UNACCEPTABLE",
+     73.0
+    ],
+    [
+     "NO_REASON_GIVEN",
+     71.0
+    ],
+    [
+     "NO_LONGER_NEEDED",
+     62.0
+    ],
+    [
+     "TOO_SMALL",
+     60.0
+    ],
+    [
+     "NOT_AS_DESCRIBED",
+     55.0
+    ]
+   ]
+  }
+ },
+ {
+  "id": "D01",
+  "category": "dimension",
+  "question": "运营A负责的店铺上个月销售额是多少?",
+  "expected_sql": "SELECT SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency JOIN dim_stores s ON o.store_id = s.store_id WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND o.purchase_date < DATE_FORMAT(CURDATE(), '%Y-%m-01') AND s.owner = '运营A'",
+  "generated_sql": "SELECT\n    SUM(o.item_amount * r.rate_to_cny) AS sales_cny\nFROM amz_order_items o\nJOIN dim_stores s\n    ON o.store_id = s.store_id\nJOIN exchange_rates r\n    ON o.purchase_date = r.rate_date\n   AND o.currency = r.currency\nWHERE s.owner = '运营A'\n  AND o.order_status NOT IN ('Canceled', 'Pending')\n  AND o.purchase_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')\n  AND o.purchase_date < DATE_FORMAT(CURDATE(), '%Y-%m-01');",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "sales_cny"
+   ],
+   "expected_row_count": 1,
+   "generated_columns": [
+    "sales_cny"
+   ],
+   "generated_row_count": 1
+  },
+  "check_points": [
+   "owner 在 dim_stores",
+   "字段值是 '运营A'"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "sales_cny"
+   ],
+   "rows": [
+    [
+     253177.3392
+    ]
+   ]
+  }
+ },
+ {
+  "id": "M01",
+  "category": "multi",
+  "question": "各品类上个月的销售额和广告花费分别是多少?",
+  "expected_sql": "SELECT sl.category, sl.sales_cny, COALESCE(ad.ad_spend_cny, 0) AS ad_spend_cny FROM (SELECT p.category, SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN dim_products p ON o.store_id = p.store_id AND o.msku = p.msku JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND o.purchase_date < DATE_FORMAT(CURDATE(), '%Y-%m-01') GROUP BY p.category) sl LEFT JOIN (SELECT p.category, SUM(a.spend * r.rate_to_cny) AS ad_spend_cny FROM amz_ads_daily a JOIN dim_products p ON a.store_id = p.store_id AND a.msku = p.msku JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency WHERE a.report_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND a.report_date < DATE_FORMAT(CURDATE(), '%Y-%m-01') GROUP BY p.category) ad ON sl.category = ad.category ORDER BY sl.sales_cny DESC",
+  "generated_sql": "WITH sales_agg AS (\n    SELECT\n        COALESCE(NULLIF(p.category, ''), '未知') AS category,\n        SUM(o.item_amount * r.rate_to_cny) AS sales_cny\n    FROM amz_order_items o\n    LEFT JOIN dim_products p\n        ON o.store_id = p.store_id\n       AND o.msku = p.msku\n    JOIN exchange_rates r\n        ON o.purchase_date = r.rate_date\n       AND o.currency = r.currency\n    WHERE o.order_status NOT IN ('Canceled', 'Pending')\n      AND o.purchase_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')\n      AND o.purchase_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')\n    GROUP BY COALESCE(NULLIF(p.category, ''), '未知')\n),\nads_agg AS (\n    SELECT\n        COALESCE(NULLIF(p.category, ''), '未知') AS category,\n        SUM(a.spend * r.rate_to_cny) AS ad_spend_cny\n    FROM amz_ads_daily a\n    LEFT JOIN dim_products p\n        ON a.store_id = p.store_id\n       AND a.msku = p.msku\n    JOIN exchange_rates r\n        ON a.report_date = r.rate_date\n       AND a.currency = r.currency\n    WHERE a.report_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')\n      AND a.report_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')\n    GROUP BY COALESCE(NULLIF(p.category, ''), '未知')\n),\nall_categories AS (\n    SELECT category FROM sales_agg\n    UNION\n    SELECT category FROM ads_agg\n)\nSELECT\n    c.category,\n    COALESCE(s.sales_cny, 0) AS sales_cny,\n    COALESCE(a.ad_spend_cny, 0) AS ad_spend_cny\nFROM all_categories c\nLEFT JOIN sales_agg s\n    ON c.category = s.category\nLEFT JOIN ads_agg a\n    ON c.category = a.category\nORDER BY c.category;",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "category",
+    "sales_cny",
+    "ad_spend_cny"
+   ],
+   "expected_row_count": 5,
+   "generated_columns": [
+    "category",
+    "sales_cny",
+    "ad_spend_cny"
+   ],
+   "generated_row_count": 5
+  },
+  "check_points": [
+   "不能把订单表和广告表直接 JOIN",
+   "广告表通过 msku 关联商品表"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "category",
+    "sales_cny",
+    "ad_spend_cny"
+   ],
+   "rows": [
+    [
+     "厨房用品",
+     144042.9015,
+     12598.2299
+    ],
+    [
+     "户外运动",
+     126689.7731,
+     8397.5722
+    ],
+    [
+     "家居收纳",
+     86165.2184,
+     8901.1019
+    ],
+    [
+     "宠物用品",
+     64346.6357,
+     5785.2937
+    ],
+    [
+     "家居照明",
+     9822.7071,
+     944.3129
+    ]
+   ]
+  }
+ },
+ {
+  "id": "M02",
+  "category": "multi",
+  "question": "各站点本月利润是多少?",
+  "expected_sql": "SELECT st.marketplace, COALESCE(s.sales_cny, 0) - COALESCE(c.cogs_cny, 0) - COALESCE(f.fee_cny, 0) - COALESCE(ad.ad_spend_cny, 0) AS profit_cny FROM dim_stores st LEFT JOIN (SELECT o.store_id, SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND o.purchase_date <= CURDATE() GROUP BY o.store_id) s ON st.store_id = s.store_id LEFT JOIN (SELECT o.store_id, SUM((p.unit_cost + p.head_freight_cost) * o.quantity) AS cogs_cny FROM amz_order_items o JOIN dim_products p ON o.store_id = p.store_id AND o.msku = p.msku WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND o.purchase_date <= CURDATE() GROUP BY o.store_id) c ON st.store_id = c.store_id LEFT JOIN (SELECT x.store_id, -SUM(x.amount * r.rate_to_cny) AS fee_cny FROM amz_settlement x JOIN exchange_rates r ON x.posted_date = r.rate_date AND x.currency = r.currency WHERE x.fee_type IN ('commission', 'fba_fee', 'storage_fee') AND x.posted_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND x.posted_date <= CURDATE() GROUP BY x.store_id) f ON st.store_id = f.store_id LEFT JOIN (SELECT a.store_id, SUM(a.spend * r.rate_to_cny) AS ad_spend_cny FROM amz_ads_daily a JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency WHERE a.report_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND a.report_date <= CURDATE() GROUP BY a.store_id) ad ON st.store_id = ad.store_id ORDER BY profit_cny DESC",
+  "generated_sql": "WITH marketplaces AS (\n    SELECT DISTINCT marketplace\n    FROM dim_stores\n    WHERE marketplace IS NOT NULL\n),\nsales_agg AS (\n    SELECT\n        s.marketplace,\n        SUM(o.item_amount * r.rate_to_cny) AS sales_cny\n    FROM amz_order_items o\n    JOIN dim_stores s\n        ON o.store_id = s.store_id\n    JOIN exchange_rates r\n        ON o.purchase_date = r.rate_date\n       AND o.currency = r.currency\n    WHERE o.order_status NOT IN ('Canceled', 'Pending')\n      AND o.purchase_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')\n      AND o.purchase_date <= CURDATE()\n    GROUP BY s.marketplace\n),\ncost_agg AS (\n    SELECT\n        s.marketplace,\n        SUM((p.unit_cost + p.head_freight_cost) * o.quantity) AS cost_cny\n    FROM amz_order_items o\n    JOIN dim_stores s\n        ON o.store_id = s.store_id\n    JOIN dim_products p\n        ON o.store_id = p.store_id\n       AND o.msku = p.msku\n    WHERE o.order_status NOT IN ('Canceled', 'Pending')\n      AND o.purchase_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')\n      AND o.purchase_date <= CURDATE()\n    GROUP BY s.marketplace\n),\nplatform_fee_agg AS (\n    SELECT\n        s.marketplace,\n        -SUM(st.amount * r.rate_to_cny) AS platform_fee_cny\n    FROM amz_settlement st\n    JOIN dim_stores s\n        ON st.store_id = s.store_id\n    JOIN exchange_rates r\n        ON st.posted_date = r.rate_date\n       AND st.currency = r.currency\n    WHERE st.fee_type IN ('commission', 'fba_fee', 'storage_fee')\n      AND st.posted_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')\n      AND st.posted_date <= CURDATE()\n    GROUP BY s.marketplace\n),\nad_spend_agg AS (\n    SELECT\n        s.marketplace,\n        SUM(a.spend * r.rate_to_cny) AS ad_spend_cny\n    FROM amz_ads_daily a\n    JOIN dim_stores s\n        ON a.store_id = s.store_id\n    JOIN exchange_rates r\n        ON a.report_date = r.rate_date\n       AND a.currency = r.currency\n    WHERE a.report_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')\n      AND a.report_date <= CURDATE()\n    GROUP BY s.marketplace\n)\nSELECT\n    m.marketplace,\n    COALESCE(sa.sales_cny, 0)\n    - COALESCE(ca.cost_cny, 0)\n    - COALESCE(pf.platform_fee_cny, 0)\n    - COALESCE(ad.ad_spend_cny, 0) AS profit_cny\nFROM marketplaces m\nLEFT JOIN sales_agg sa\n    ON m.marketplace = sa.marketplace\nLEFT JOIN cost_agg ca\n    ON m.marketplace = ca.marketplace\nLEFT JOIN platform_fee_agg pf\n    ON m.marketplace = pf.marketplace\nLEFT JOIN ad_spend_agg ad\n    ON m.marketplace = ad.marketplace\nORDER BY profit_cny DESC;",
+  "exact_match": false,
+  "execution_match": true,
+  "error": null,
+  "detail": {
+   "expected_columns": [
+    "marketplace",
+    "profit_cny"
+   ],
+   "expected_row_count": 4,
+   "generated_columns": [
+    "marketplace",
+    "profit_cny"
+   ],
+   "generated_row_count": 4
+  },
+  "check_points": [
+   "以 dim_stores 为基表 LEFT JOIN 各子查询",
+   "每个子查询都带本月条件"
+  ],
+  "expected_result": {
+   "as_of": "2026-10-19",
+   "columns": [
+    "marketplace",
+    "profit_cny"
+   ],
+   "rows": [
+    [
+     "US",
+     18496.5238
+    ],
+    [
+     "UK",
+     8810.197
+    ],
+    [
+     "DE",
+     6763.9303
+    ],
+    [
+     "CA",
+     3731.6626
+    ]
+   ]
+  }
+ }
+]

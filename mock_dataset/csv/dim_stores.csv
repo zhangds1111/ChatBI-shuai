@@ -1,0 +1,5 @@
+store_id,store_name,marketplace,currency,timezone,owner
+US01,ACME-US,US,USD,America/Los_Angeles,运营A
+CA01,ACME-CA,CA,CAD,America/Toronto,运营A
+UK01,ACME-UK,UK,GBP,Europe/London,运营B
+DE01,ACME-DE,DE,EUR,Europe/Berlin,运营B

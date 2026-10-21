@@ -13,6 +13,7 @@
 两者可独立开关，均有 fallback 机制保障稳定性。
 """
 
+import datetime
 import json
 import re
 import sys
@@ -22,6 +23,7 @@ from typing import Generator
 
 from config import APP_CONFIG, LLM_CONFIG
 from database import DatabaseClient, QueryExecutionError
+from error_analyzer import check_date_year, check_time_bounds
 from indicator_knowledge import IndicatorKnowledge
 from llm_client import LLMClient
 from prompt_builder import build_prompt
@@ -29,6 +31,7 @@ from query_parser import QueryParser
 from result_formatter import ResultFormatter
 from runtime_factory import build_runtime
 from security import SecurityError, UserContext
+from tracing import reduce_sse, traceable, trim_context_inputs, trim_query_outputs
 
 
 class ChatBISystem:
@@ -69,6 +72,11 @@ class ChatBISystem:
             resolved[option_name] = value if value is not None else feature_defaults.get(feature_key, False)
         return resolved
 
+    @traceable(
+        name="指标上下文解析",
+        run_type="chain",
+        process_inputs=trim_context_inputs,
+    )
     def _resolve_indicator_context(
         self,
         user_question: str,
@@ -102,6 +110,11 @@ class ChatBISystem:
 
         return detected_indicators, indicator_block
 
+    @traceable(
+        name="问答链路",
+        run_type="chain",
+        process_outputs=trim_query_outputs,
+    )
     def run(
         self,
         user_question: str,
@@ -194,13 +207,27 @@ class ChatBISystem:
                     "used_indicator_rag": use_indicator_rag,
                     "source_id": runtime.source_id,
                     "security_role": user_context.role,
-                    "security_region": user_context.region,
+                    "security_operator": user_context.operator_name,
                 }
             }
 
+        # 4.5 SQL 校验：时间边界缺上界 / 日期年份错误则打回重写（最多一次）
+        time_issue = check_time_bounds(user_question, sql) or check_date_year(user_question, sql)
+        time_bounds_rewritten = False
+        if time_issue:
+            try:
+                sql = runtime.llm.generate_sql(
+                    system_msg,
+                    prompt + f"\n\n【SQL 校验打回】{time_issue}\n请修正后重新输出完整 SQL。",
+                )
+                time_bounds_rewritten = True
+            except Exception:
+                pass  # 重写失败则保留原 SQL，由执行层/评测暴露问题
+            time_issue = check_time_bounds(user_question, sql) or check_date_year(user_question, sql)
+
         # 5. 执行 SQL
         try:
-            columns, results = runtime.db.execute(sql, user=user_context)
+            columns, results = runtime.db.execute(sql, user=user_context, question=user_question)
             db_info = getattr(runtime.db, "last_query_info", {})
             formatted = runtime.formatter.format(columns, results)
             return {
@@ -220,11 +247,14 @@ class ChatBISystem:
                     "used_indicator_rag": use_indicator_rag,
                     "source_id": runtime.source_id,
                     "security_role": user_context.role,
-                    "security_region": user_context.region,
+                    "security_operator": user_context.operator_name,
                     "row_count": len(results),
                     "db_duration_ms": db_info.get("duration_ms"),
                     "db_slow_query": db_info.get("slow_query", False),
                     "db_explain_plan": db_info.get("explain_plan", []),
+                    "db_truncated": db_info.get("truncated", False),
+                    "time_bounds_rewritten": time_bounds_rewritten,
+                    "time_bounds_issue": time_issue,
                 }
             }
         except SecurityError as e:
@@ -244,7 +274,7 @@ class ChatBISystem:
                     "used_indicator_rag": use_indicator_rag,
                     "source_id": runtime.source_id,
                     "security_role": user_context.role,
-                    "security_region": user_context.region,
+                    "security_operator": user_context.operator_name,
                 }
             }
         except QueryExecutionError as e:
@@ -264,7 +294,7 @@ class ChatBISystem:
                     "used_indicator_rag": use_indicator_rag,
                     "source_id": runtime.source_id,
                     "security_role": user_context.role,
-                    "security_region": user_context.region,
+                    "security_operator": user_context.operator_name,
                     "db_duration_ms": e.metadata.get("duration_ms"),
                     "db_error_code": e.metadata.get("error_code"),
                     "db_raw_error": e.metadata.get("raw_error"),
@@ -287,10 +317,15 @@ class ChatBISystem:
                     "used_indicator_rag": use_indicator_rag,
                     "source_id": runtime.source_id,
                     "security_role": user_context.role,
-                    "security_region": user_context.region,
+                    "security_operator": user_context.operator_name,
                 }
             }
 
+    @traceable(
+        name="问答链路（流式）",
+        run_type="chain",
+        reduce_fn=reduce_sse,
+    )
     def run_stream(
         self,
         user_question: str,
@@ -394,7 +429,7 @@ class ChatBISystem:
                     "used_indicator_rag": use_indicator_rag,
                     "source_id": runtime.source_id,
                     "security_role": user_context.role,
-                    "security_region": user_context.region,
+                    "security_operator": user_context.operator_name,
                 }
             })
             return
@@ -403,11 +438,26 @@ class ChatBISystem:
         raw_sql = "".join(sql_parts)
         sql = re.sub(r'```sql|```', '', raw_sql).strip()
 
+        # 5.5 SQL 校验：时间边界缺上界 / 日期年份错误则打回重写（非流式重生成一次）
+        time_issue = check_time_bounds(user_question, sql) or check_date_year(user_question, sql)
+        time_bounds_rewritten = False
+        if time_issue:
+            try:
+                sql = runtime.llm.generate_sql(
+                    system_msg,
+                    prompt + f"\n\n【SQL 校验打回】{time_issue}\n请修正后重新输出完整 SQL。",
+                )
+                time_bounds_rewritten = True
+                yield _sse_event("sql_rewrite", {"issue": time_issue, "sql": sql})
+            except Exception:
+                pass  # 重写失败则保留原 SQL
+            time_issue = check_time_bounds(user_question, sql) or check_date_year(user_question, sql)
+
         yield _sse_event("sql_done", {"sql": sql})
 
         # 6. 执行 SQL
         try:
-            columns, results = runtime.db.execute(sql, user=user_context)
+            columns, results = runtime.db.execute(sql, user=user_context, question=user_question)
             db_info = getattr(runtime.db, "last_query_info", {})
             rows_dict = [dict(zip(columns, row)) for row in results]
             yield _sse_event("result", {
@@ -415,6 +465,8 @@ class ChatBISystem:
                 "rows": rows_dict,
                 "row_count": len(results),
                 "metadata": {
+                    "time_bounds_rewritten": time_bounds_rewritten,
+                    "time_bounds_issue": time_issue,
                     "detected_indicators": detected_indicators,
                     "model": LLM_CONFIG["model"],
                     "used_few_shot": use_few_shot,
@@ -425,10 +477,11 @@ class ChatBISystem:
                     "used_indicator_rag": use_indicator_rag,
                     "source_id": runtime.source_id,
                     "security_role": user_context.role,
-                    "security_region": user_context.region,
+                    "security_operator": user_context.operator_name,
                     "db_duration_ms": db_info.get("duration_ms"),
                     "db_slow_query": db_info.get("slow_query", False),
                     "db_explain_plan": db_info.get("explain_plan", []),
+                    "db_truncated": db_info.get("truncated", False),
                 }
             })
         except SecurityError as e:
@@ -444,7 +497,7 @@ class ChatBISystem:
                     "used_indicator_rag": use_indicator_rag,
                     "source_id": runtime.source_id,
                     "security_role": user_context.role,
-                    "security_region": user_context.region,
+                    "security_operator": user_context.operator_name,
                 }
             })
         except QueryExecutionError as e:
@@ -460,7 +513,7 @@ class ChatBISystem:
                     "used_indicator_rag": use_indicator_rag,
                     "source_id": runtime.source_id,
                     "security_role": user_context.role,
-                    "security_region": user_context.region,
+                    "security_operator": user_context.operator_name,
                     "db_duration_ms": e.metadata.get("duration_ms"),
                     "db_error_code": e.metadata.get("error_code"),
                     "db_raw_error": e.metadata.get("raw_error"),
@@ -479,7 +532,7 @@ class ChatBISystem:
                     "used_indicator_rag": use_indicator_rag,
                     "source_id": runtime.source_id,
                     "security_role": user_context.role,
-                    "security_region": user_context.region,
+                    "security_operator": user_context.operator_name,
                 }
             })
 
@@ -490,9 +543,17 @@ def _sse_event(event_type: str, data: dict) -> str:
 
 
 def _json_serializer(obj):
-    """JSON 序列化补充：处理 Decimal 等非标准类型"""
+    """JSON 序列化补充：处理 Decimal、日期等非标准类型"""
     if isinstance(obj, Decimal):
         return float(obj)
+    if isinstance(obj, datetime.datetime):
+        return obj.isoformat(sep=" ", timespec="seconds")
+    if isinstance(obj, datetime.date):
+        return obj.isoformat()
+    if isinstance(obj, datetime.time):
+        return obj.isoformat(timespec="seconds")
+    if isinstance(obj, (bytes, bytearray)):
+        return obj.decode("utf-8", errors="replace")
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 

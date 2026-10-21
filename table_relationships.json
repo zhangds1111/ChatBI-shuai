@@ -1,0 +1,583 @@
+{
+  "_comment": "表关联图。fk_col/pk_col 均可为复合键(逗号分隔,按顺序一一对应)。join_type 为从当前表走向 target 时推荐的连接方式。relation 为 当前表:target表 的基数。",
+  "TABLE_RELATIONSHIPS": {
+    "dim_stores": [
+      {
+        "target": "amz_order_items",
+        "fk_col": "store_id",
+        "pk_col": "store_id",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN"
+      },
+      {
+        "target": "amz_ads_daily",
+        "fk_col": "store_id",
+        "pk_col": "store_id",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN"
+      },
+      {
+        "target": "amz_traffic_daily",
+        "fk_col": "store_id",
+        "pk_col": "store_id",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN"
+      },
+      {
+        "target": "amz_fba_inventory",
+        "fk_col": "store_id",
+        "pk_col": "store_id",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN"
+      },
+      {
+        "target": "amz_settlement",
+        "fk_col": "store_id",
+        "pk_col": "store_id",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN"
+      },
+      {
+        "target": "amz_returns",
+        "fk_col": "store_id",
+        "pk_col": "store_id",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN"
+      },
+      {
+        "target": "dim_products",
+        "fk_col": "store_id",
+        "pk_col": "store_id",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN"
+      }
+    ],
+    "dim_products": [
+      {
+        "target": "amz_order_items",
+        "fk_col": "store_id, msku",
+        "pk_col": "store_id, msku",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN。dim_products 在 (store_id, msku) 上唯一,可安全 JOIN"
+      },
+      {
+        "target": "amz_ads_daily",
+        "fk_col": "store_id, msku",
+        "pk_col": "store_id, msku",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN。优先用 msku 关联;用 asin 关联会因一对多放大数值"
+      },
+      {
+        "target": "amz_traffic_daily",
+        "fk_col": "store_id, asin",
+        "pk_col": "store_id, asin",
+        "join_type": "LEFT JOIN",
+        "relation": "N:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN。真实数据中一个 ASIN 可对应多个 MSKU,关联会放大会话数(模拟库恰好一对一);需要品类等属性时先将 dim_products 按 (store_id, asin) 去重"
+      },
+      {
+        "target": "amz_fba_inventory",
+        "fk_col": "store_id, msku",
+        "pk_col": "store_id, msku",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN"
+      },
+      {
+        "target": "amz_settlement",
+        "fk_col": "store_id, msku",
+        "pk_col": "store_id, msku",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN。msku 可为空(店铺级费用),必须 LEFT JOIN"
+      },
+      {
+        "target": "amz_returns",
+        "fk_col": "store_id, msku",
+        "pk_col": "store_id, msku",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN"
+      },
+      {
+        "target": "dim_stores",
+        "fk_col": "store_id",
+        "pk_col": "store_id",
+        "join_type": "JOIN",
+        "relation": "N:1",
+        "note": ""
+      }
+    ],
+    "exchange_rates": [
+      {
+        "target": "amz_order_items",
+        "fk_col": "rate_date, currency",
+        "pk_col": "purchase_date, currency",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN。按下单日汇率折算"
+      },
+      {
+        "target": "amz_ads_daily",
+        "fk_col": "rate_date, currency",
+        "pk_col": "report_date, currency",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN。按报告日汇率折算"
+      },
+      {
+        "target": "amz_settlement",
+        "fk_col": "rate_date, currency",
+        "pk_col": "posted_date, currency",
+        "join_type": "LEFT JOIN",
+        "relation": "1:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN。按入账日汇率折算"
+      }
+    ],
+    "amz_order_items": [
+      {
+        "target": "dim_stores",
+        "fk_col": "store_id",
+        "pk_col": "store_id",
+        "join_type": "JOIN",
+        "relation": "N:1",
+        "note": ""
+      },
+      {
+        "target": "dim_products",
+        "fk_col": "store_id, msku",
+        "pk_col": "store_id, msku",
+        "join_type": "JOIN",
+        "relation": "N:1",
+        "note": "dim_products 在 (store_id, msku) 上唯一,可安全 JOIN"
+      },
+      {
+        "target": "exchange_rates",
+        "fk_col": "purchase_date, currency",
+        "pk_col": "rate_date, currency",
+        "join_type": "LEFT JOIN",
+        "relation": "N:1",
+        "note": "按下单日汇率折算"
+      },
+      {
+        "target": "amz_returns",
+        "fk_col": "order_id, msku",
+        "pk_col": "order_id, msku",
+        "join_type": "LEFT JOIN",
+        "relation": "N:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN。订单可含多商品行,必须同时带 msku 条件;同一订单同 MSKU 仍可能有多行,模拟库实测 463 条退货关联后变 480 行,聚合前需先对订单明细去重"
+      },
+      {
+        "target": "amz_settlement",
+        "fk_col": "order_id, msku",
+        "pk_col": "order_id, msku",
+        "join_type": "LEFT JOIN",
+        "relation": "N:N",
+        "note": "从维度/参考表出发找事实表,使用 LEFT JOIN。仅在需要结算与订单对账时使用;同一订单有多条结算明细,会放大订单金额"
+      }
+    ],
+    "amz_ads_daily": [
+      {
+        "target": "dim_stores",
+        "fk_col": "store_id",
+        "pk_col": "store_id",
+        "join_type": "JOIN",
+        "relation": "N:1",
+        "note": ""
+      },
+      {
+        "target": "exchange_rates",
+        "fk_col": "report_date, currency",
+        "pk_col": "rate_date, currency",
+        "join_type": "LEFT JOIN",
+        "relation": "N:1",
+        "note": "按报告日汇率折算"
+      },
+      {
+        "target": "dim_products",
+        "fk_col": "store_id, msku",
+        "pk_col": "store_id, msku",
+        "join_type": "LEFT JOIN",
+        "relation": "N:1",
+        "note": "优先用 msku 关联;用 asin 关联会因一对多放大数值"
+      }
+    ],
+    "amz_traffic_daily": [
+      {
+        "target": "dim_stores",
+        "fk_col": "store_id",
+        "pk_col": "store_id",
+        "join_type": "JOIN",
+        "relation": "N:1",
+        "note": ""
+      },
+      {
+        "target": "dim_products",
+        "fk_col": "store_id, asin",
+        "pk_col": "store_id, asin",
+        "join_type": "LEFT JOIN",
+        "relation": "N:N",
+        "note": "真实数据中一个 ASIN 可对应多个 MSKU,关联会放大会话数(模拟库恰好一对一);需要品类等属性时先将 dim_products 按 (store_id, asin) 去重"
+      }
+    ],
+    "amz_fba_inventory": [
+      {
+        "target": "dim_stores",
+        "fk_col": "store_id",
+        "pk_col": "store_id",
+        "join_type": "JOIN",
+        "relation": "N:1",
+        "note": ""
+      },
+      {
+        "target": "dim_products",
+        "fk_col": "store_id, msku",
+        "pk_col": "store_id, msku",
+        "join_type": "JOIN",
+        "relation": "N:1",
+        "note": ""
+      }
+    ],
+    "amz_settlement": [
+      {
+        "target": "dim_stores",
+        "fk_col": "store_id",
+        "pk_col": "store_id",
+        "join_type": "JOIN",
+        "relation": "N:1",
+        "note": ""
+      },
+      {
+        "target": "exchange_rates",
+        "fk_col": "posted_date, currency",
+        "pk_col": "rate_date, currency",
+        "join_type": "LEFT JOIN",
+        "relation": "N:1",
+        "note": "按入账日汇率折算"
+      },
+      {
+        "target": "dim_products",
+        "fk_col": "store_id, msku",
+        "pk_col": "store_id, msku",
+        "join_type": "LEFT JOIN",
+        "relation": "N:1",
+        "note": "msku 可为空(店铺级费用),必须 LEFT JOIN"
+      },
+      {
+        "target": "amz_order_items",
+        "fk_col": "order_id, msku",
+        "pk_col": "order_id, msku",
+        "join_type": "LEFT JOIN",
+        "relation": "N:N",
+        "note": "仅在需要结算与订单对账时使用;同一订单有多条结算明细,会放大订单金额"
+      }
+    ],
+    "amz_returns": [
+      {
+        "target": "dim_stores",
+        "fk_col": "store_id",
+        "pk_col": "store_id",
+        "join_type": "JOIN",
+        "relation": "N:1",
+        "note": ""
+      },
+      {
+        "target": "dim_products",
+        "fk_col": "store_id, msku",
+        "pk_col": "store_id, msku",
+        "join_type": "JOIN",
+        "relation": "N:1",
+        "note": ""
+      },
+      {
+        "target": "amz_order_items",
+        "fk_col": "order_id, msku",
+        "pk_col": "order_id, msku",
+        "join_type": "LEFT JOIN",
+        "relation": "N:N",
+        "note": "订单可含多商品行,必须同时带 msku 条件;同一订单同 MSKU 仍可能有多行,模拟库实测 463 条退货关联后变 480 行,聚合前需先对订单明细去重"
+      }
+    ]
+  },
+  "TABLE_TYPES": {
+    "dim_stores": "dimension",
+    "dim_products": "dimension",
+    "exchange_rates": "reference",
+    "amz_order_items": "fact",
+    "amz_ads_daily": "fact",
+    "amz_traffic_daily": "fact",
+    "amz_fba_inventory": "fact",
+    "amz_settlement": "fact",
+    "amz_returns": "fact"
+  },
+  "TABLE_KEYWORDS": {
+    "dim_stores": [
+      "店铺",
+      "站点",
+      "国家",
+      "运营",
+      "负责人",
+      "币种",
+      "US",
+      "UK",
+      "DE",
+      "CA"
+    ],
+    "dim_products": [
+      "商品",
+      "产品",
+      "品类",
+      "SKU",
+      "MSKU",
+      "ASIN",
+      "父ASIN",
+      "成本",
+      "采购",
+      "头程",
+      "上架",
+      "品类",
+      "产品经理"
+    ],
+    "exchange_rates": [
+      "汇率",
+      "币种",
+      "人民币",
+      "折算",
+      "美元",
+      "英镑",
+      "欧元",
+      "加元",
+      "rate"
+    ],
+    "amz_order_items": [
+      "销售额",
+      "收入",
+      "营收",
+      "订单",
+      "销量",
+      "件数",
+      "客单价",
+      "GMV",
+      "下单",
+      "取消",
+      "促销",
+      "运费",
+      "毛利",
+      "利润"
+    ],
+    "amz_ads_daily": [
+      "广告",
+      "ACOS",
+      "ROAS",
+      "CPC",
+      "点击",
+      "曝光",
+      "花费",
+      "广告费",
+      "TACOS",
+      "SP",
+      "SB",
+      "广告活动",
+      "campaign"
+    ],
+    "amz_traffic_daily": [
+      "流量",
+      "会话",
+      "访问",
+      "转化率",
+      "Buy Box",
+      "购物车",
+      "页面浏览",
+      "sessions",
+      "曝光"
+    ],
+    "amz_fba_inventory": [
+      "库存",
+      "可售",
+      "库龄",
+      "滞销",
+      "可售天数",
+      "补货",
+      "在途",
+      "FBA库存",
+      "老库存",
+      "呆滞"
+    ],
+    "amz_settlement": [
+      "回款",
+      "结算",
+      "佣金",
+      "FBA费",
+      "仓储费",
+      "平台费用",
+      "费用",
+      "到账",
+      "放款",
+      "settlement",
+      "利润"
+    ],
+    "amz_returns": [
+      "退货",
+      "退货率",
+      "退货原因",
+      "退款",
+      "瑕疵",
+      "return"
+    ]
+  },
+  "edges": [
+    {
+      "from": "amz_order_items",
+      "to": "dim_stores",
+      "from_cols": "store_id",
+      "to_cols": "store_id",
+      "cardinality": "N:1",
+      "note": ""
+    },
+    {
+      "from": "amz_order_items",
+      "to": "dim_products",
+      "from_cols": "store_id, msku",
+      "to_cols": "store_id, msku",
+      "cardinality": "N:1",
+      "note": "dim_products 在 (store_id, msku) 上唯一,可安全 JOIN"
+    },
+    {
+      "from": "amz_order_items",
+      "to": "exchange_rates",
+      "from_cols": "purchase_date, currency",
+      "to_cols": "rate_date, currency",
+      "cardinality": "N:1",
+      "note": "按下单日汇率折算"
+    },
+    {
+      "from": "amz_ads_daily",
+      "to": "dim_stores",
+      "from_cols": "store_id",
+      "to_cols": "store_id",
+      "cardinality": "N:1",
+      "note": ""
+    },
+    {
+      "from": "amz_ads_daily",
+      "to": "exchange_rates",
+      "from_cols": "report_date, currency",
+      "to_cols": "rate_date, currency",
+      "cardinality": "N:1",
+      "note": "按报告日汇率折算"
+    },
+    {
+      "from": "amz_ads_daily",
+      "to": "dim_products",
+      "from_cols": "store_id, msku",
+      "to_cols": "store_id, msku",
+      "cardinality": "N:1",
+      "note": "优先用 msku 关联;用 asin 关联会因一对多放大数值"
+    },
+    {
+      "from": "amz_traffic_daily",
+      "to": "dim_stores",
+      "from_cols": "store_id",
+      "to_cols": "store_id",
+      "cardinality": "N:1",
+      "note": ""
+    },
+    {
+      "from": "amz_traffic_daily",
+      "to": "dim_products",
+      "from_cols": "store_id, asin",
+      "to_cols": "store_id, asin",
+      "cardinality": "N:N",
+      "note": "真实数据中一个 ASIN 可对应多个 MSKU,关联会放大会话数(模拟库恰好一对一);需要品类等属性时先将 dim_products 按 (store_id, asin) 去重"
+    },
+    {
+      "from": "amz_fba_inventory",
+      "to": "dim_stores",
+      "from_cols": "store_id",
+      "to_cols": "store_id",
+      "cardinality": "N:1",
+      "note": ""
+    },
+    {
+      "from": "amz_fba_inventory",
+      "to": "dim_products",
+      "from_cols": "store_id, msku",
+      "to_cols": "store_id, msku",
+      "cardinality": "N:1",
+      "note": ""
+    },
+    {
+      "from": "amz_settlement",
+      "to": "dim_stores",
+      "from_cols": "store_id",
+      "to_cols": "store_id",
+      "cardinality": "N:1",
+      "note": ""
+    },
+    {
+      "from": "amz_settlement",
+      "to": "exchange_rates",
+      "from_cols": "posted_date, currency",
+      "to_cols": "rate_date, currency",
+      "cardinality": "N:1",
+      "note": "按入账日汇率折算"
+    },
+    {
+      "from": "amz_settlement",
+      "to": "dim_products",
+      "from_cols": "store_id, msku",
+      "to_cols": "store_id, msku",
+      "cardinality": "N:1",
+      "note": "msku 可为空(店铺级费用),必须 LEFT JOIN"
+    },
+    {
+      "from": "amz_returns",
+      "to": "dim_stores",
+      "from_cols": "store_id",
+      "to_cols": "store_id",
+      "cardinality": "N:1",
+      "note": ""
+    },
+    {
+      "from": "amz_returns",
+      "to": "dim_products",
+      "from_cols": "store_id, msku",
+      "to_cols": "store_id, msku",
+      "cardinality": "N:1",
+      "note": ""
+    },
+    {
+      "from": "amz_returns",
+      "to": "amz_order_items",
+      "from_cols": "order_id, msku",
+      "to_cols": "order_id, msku",
+      "cardinality": "N:N",
+      "note": "订单可含多商品行,必须同时带 msku 条件;同一订单同 MSKU 仍可能有多行,模拟库实测 463 条退货关联后变 480 行,聚合前需先对订单明细去重"
+    },
+    {
+      "from": "amz_settlement",
+      "to": "amz_order_items",
+      "from_cols": "order_id, msku",
+      "to_cols": "order_id, msku",
+      "cardinality": "N:N",
+      "note": "仅在需要结算与订单对账时使用;同一订单有多条结算明细,会放大订单金额"
+    },
+    {
+      "from": "dim_products",
+      "to": "dim_stores",
+      "from_cols": "store_id",
+      "to_cols": "store_id",
+      "cardinality": "N:1",
+      "note": ""
+    }
+  ]
+}

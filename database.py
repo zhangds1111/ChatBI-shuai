@@ -7,7 +7,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+from datetime import datetime, timezone
 from queue import Empty, LifoQueue
 from time import perf_counter
 from typing import Any, Callable
@@ -15,9 +17,12 @@ from typing import Any, Callable
 import pymysql
 
 from config import APP_CONFIG, DB_RUNTIME_CONFIG, get_database_source_config
-from security import QuerySecurityManager, UserContext
+from security import QuerySecurityManager, SecurityError, UserContext
+from tracing import traceable
 
 logger = logging.getLogger("chatbi.database")
+# 审计日志：JSON 行，只记录访问轨迹，不记录结果数据
+audit_logger = logging.getLogger("chatbi.audit")
 
 
 class QueryExecutionError(RuntimeError):
@@ -116,6 +121,12 @@ class DatabaseClient:
         self.connection_factory = connection_factory
         self.connection_pool = connection_pool
         self.last_query_info: dict[str, Any] = {}
+        self.max_rows = int(
+            APP_CONFIG.get("security", {}).get("max_rows", 1000)
+        )
+        self.query_timeout_ms = int(
+            APP_CONFIG.get("security", {}).get("query_timeout_ms", 30000)
+        )
 
         if self.connection_factory is None and self.connection_pool is None:
             self.connection_pool = DatabaseConnectionPool(
@@ -125,30 +136,71 @@ class DatabaseClient:
                 pool_timeout=DB_RUNTIME_CONFIG["pool_timeout"],
             )
 
+        # 行级权限依赖 dim_stores.owner -> store_id 映射：启动时预热，之后按 TTL 刷新
+        if getattr(self.security, "store_directory", None) is not None:
+            self.security.store_directory.attach_fetcher(self._fetch_store_owner_map)
+            if connection_factory is None:
+                try:
+                    self.security.store_directory.refresh()
+                except Exception as exc:  # noqa: BLE001 - 数据库暂不可用时延迟到首次查询再取
+                    logger.warning("Store owner map prefetch failed: %s", exc)
+
+    @traceable(name="SQL执行", run_type="tool")
     def execute(
         self,
         sql: str,
         user: UserContext | None = None,
+        *,
+        question: str | None = None,
     ) -> tuple[list[str], list[tuple]]:
         """
         执行 SQL 并返回结果
 
         Args:
             sql: 待执行的 SQL 语句
+            user: 权限上下文；未传时使用 demo_admin（评测等内部调用）
+            question: 原始自然语言问题，仅用于审计日志
 
         Returns:
             (列名列表, 结果行列表)
         """
         user_context = user or UserContext.demo_admin()
-        secured_sql = self.security.secure_sql(sql, user_context)
         started_at = self.time_fn()
+
+        try:
+            secured_sql = self.security.secure_sql(sql, user_context)
+        except SecurityError as exc:
+            duration_ms = round((self.time_fn() - started_at) * 1000, 2)
+            self.last_query_info = {
+                "sql": None,
+                "duration_ms": duration_ms,
+                "slow_query": False,
+                "explain_plan": [],
+                "truncated": False,
+            }
+            self._write_audit(
+                user_context=user_context,
+                question=question,
+                original_sql=sql,
+                final_sql=None,
+                blocked=True,
+                block_reason=str(exc),
+                duration_ms=duration_ms,
+                row_count=0,
+                truncated=False,
+            )
+            raise
+
         conn = None
         try:
             conn = self._acquire_connection()
             with conn.cursor() as cursor:
+                self._prepare_session(cursor)
                 cursor.execute(secured_sql)
                 columns = [desc[0] for desc in cursor.description] if cursor.description else []
-                results = cursor.fetchall()
+                fetched = self._fetch_rows(cursor, self.max_rows + 1)
+                truncated = len(fetched) > self.max_rows
+                results = fetched[: self.max_rows] if truncated else fetched
                 duration_ms = round((self.time_fn() - started_at) * 1000, 2)
                 explain_plan = self._explain(cursor, secured_sql, duration_ms)
                 self.last_query_info = {
@@ -156,6 +208,7 @@ class DatabaseClient:
                     "duration_ms": duration_ms,
                     "slow_query": bool(explain_plan),
                     "explain_plan": explain_plan,
+                    "truncated": truncated,
                 }
                 if explain_plan:
                     logger.warning(
@@ -163,8 +216,21 @@ class DatabaseClient:
                         duration_ms,
                         secured_sql,
                     )
+                self._write_audit(
+                    user_context=user_context,
+                    question=question,
+                    original_sql=sql,
+                    final_sql=secured_sql,
+                    blocked=False,
+                    block_reason=None,
+                    duration_ms=duration_ms,
+                    row_count=len(results),
+                    truncated=truncated,
+                )
                 _, masked_rows = self.security.mask_result(columns, results, user_context)
                 return columns, masked_rows
+        except SecurityError:
+            raise
         except (pymysql.MySQLError, OSError) as exc:
             duration_ms = round((self.time_fn() - started_at) * 1000, 2)
             self.last_query_info = {
@@ -172,11 +238,82 @@ class DatabaseClient:
                 "duration_ms": duration_ms,
                 "slow_query": False,
                 "explain_plan": [],
+                "truncated": False,
             }
+            self._write_audit(
+                user_context=user_context,
+                question=question,
+                original_sql=sql,
+                final_sql=secured_sql,
+                blocked=False,
+                block_reason=str(exc),
+                duration_ms=duration_ms,
+                row_count=0,
+                truncated=False,
+            )
             raise self._translate_db_error(exc, secured_sql, duration_ms) from exc
         finally:
             if conn is not None:
                 self._release_connection(conn)
+
+    def _prepare_session(self, cursor: Any) -> None:
+        """查询前设置会话级防护：只读事务 + 执行超时（毫秒）。"""
+        cursor.execute("SET SESSION TRANSACTION READ ONLY")
+        cursor.execute(f"SET SESSION max_execution_time = {int(self.query_timeout_ms)}")
+
+    @staticmethod
+    def _fetch_rows(cursor: Any, limit: int) -> list[tuple]:
+        if hasattr(cursor, "fetchmany"):
+            return list(cursor.fetchmany(limit))
+        return list(cursor.fetchall())
+
+    def _fetch_store_owner_map(self) -> dict[str, list[str]]:
+        """从 dim_stores 读出 owner -> store_id 映射（固定 SQL，供行级权限缓存刷新用）。"""
+        conn = self._acquire_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT store_id, owner FROM dim_stores")
+                rows = cursor.fetchall()
+        finally:
+            self._release_connection(conn)
+        mapping: dict[str, list[str]] = {}
+        for store_id, owner in rows:
+            if owner is None:
+                continue
+            mapping.setdefault(str(owner), []).append(str(store_id))
+        return mapping
+
+    def _write_audit(
+        self,
+        *,
+        user_context: UserContext,
+        question: str | None,
+        original_sql: str,
+        final_sql: str | None,
+        blocked: bool,
+        block_reason: str | None,
+        duration_ms: float,
+        row_count: int,
+        truncated: bool,
+    ) -> None:
+        entry = {
+            "time": datetime.now(timezone.utc).isoformat(),
+            "user_id": user_context.user_id,
+            "role": user_context.role,
+            "operator_name": user_context.operator_name,
+            "question": question,
+            "original_sql": original_sql,
+            "final_sql": final_sql,
+            "blocked": blocked,
+            "block_reason": block_reason,
+            "duration_ms": duration_ms,
+            "row_count": row_count,
+            "truncated": truncated,
+        }
+        try:
+            audit_logger.info(json.dumps(entry, ensure_ascii=False, default=str))
+        except Exception:  # noqa: BLE001 - 审计失败不影响主流程
+            logger.warning("Failed to write audit log entry")
 
     def validate_connection(self) -> bool:
         """验证数据库连接是否正常"""

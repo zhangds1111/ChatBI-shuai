@@ -1,173 +1,649 @@
 {
   "indicators": [
     {
-      "name": "收入",
+      "name": "销售额",
       "level": "原子指标",
-      "aliases": ["销售额", "营收", "销售收入", "营业收入", "总收入"],
-      "definition": "不含税销售收入，财务口径的销售额。统一使用 net_amount 字段，按订单日期的汇率折算为人民币。只统计已完成（completed）订单。",
-      "formula": "SUM(o.net_amount * r.rate_to_cny)",
-      "sql_template": "SELECT SUM(o.net_amount * r.rate_to_cny) AS revenue FROM sales_orders o JOIN exchange_rates r ON o.order_date = r.rate_date AND o.currency = r.currency WHERE o.order_status = 'completed'",
-      "data_source": "sales_orders JOIN exchange_rates",
+      "aliases": [
+        "销售收入",
+        "营收",
+        "GMV",
+        "总销售额",
+        "收入",
+        "销量金额",
+        "卖了多少钱",
+        "卖了多少"
+      ],
+      "definition": "有效订单的不含税商品销售额,按下单日汇率折算为人民币。不含运费和税费。",
+      "formula": "SUM(o.item_amount * r.rate_to_cny)",
+      "sql_template": "SELECT SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending')",
+      "data_source": "amz_order_items JOIN exchange_rates",
       "depends_on": [],
-      "time_field": "o.order_date",
-      "filters": ["o.order_status = 'completed'"],
-      "notes": "注意：gross_amount 是含税金额，除非明确要求含税否则不使用"
-    },
-    {
-      "name": "销售成本",
-      "level": "原子指标",
-      "aliases": ["成本", "COGS", "产品成本"],
-      "definition": "已售产品的实际成本，等于（材料成本 + 人工成本）× 数量。只统计已完成订单。",
-      "formula": "SUM((p.material_cost + p.labor_cost) * o.quantity)",
-      "sql_template": "SELECT SUM((p.material_cost + p.labor_cost) * o.quantity) AS cost FROM sales_orders o JOIN dim_products p ON o.product_id = p.product_id WHERE o.order_status = 'completed'",
-      "data_source": "sales_orders JOIN dim_products",
-      "depends_on": [],
-      "time_field": "o.order_date",
-      "filters": ["o.order_status = 'completed'"],
-      "notes": "standard_cost 包含制造费用分摊，毛利计算统一使用 material_cost + labor_cost"
-    },
-    {
-      "name": "毛利",
-      "level": "派生指标",
-      "aliases": ["毛利润", "gross_profit", "销售毛利"],
-      "definition": "销售收入减去销售成本。反映产品本身的盈利能力。",
-      "formula": "SUM(o.net_amount * r.rate_to_cny) - SUM((p.material_cost + p.labor_cost) * o.quantity)",
-      "sql_template": "SELECT SUM(o.net_amount * r.rate_to_cny) - SUM((p.material_cost + p.labor_cost) * o.quantity) AS gross_profit FROM sales_orders o JOIN dim_products p ON o.product_id = p.product_id JOIN exchange_rates r ON o.order_date = r.rate_date AND o.currency = r.currency WHERE o.order_status = 'completed'",
-      "data_source": "sales_orders JOIN dim_products JOIN exchange_rates",
-      "depends_on": ["收入", "销售成本"],
-      "time_field": "o.order_date",
-      "filters": ["o.order_status = 'completed'"],
-      "notes": "毛利 = 收入 - 成本，是利润计算的中间结果"
-    },
-    {
-      "name": "毛利率",
-      "level": "派生指标",
-      "aliases": ["毛利润率", "gross_margin", "产品利润率"],
-      "definition": "毛利占收入的百分比，反映产品盈利效率。",
-      "formula": "(毛利 / 收入) * 100",
-      "sql_template": "SELECT (SUM(o.net_amount * r.rate_to_cny) - SUM((p.material_cost + p.labor_cost) * o.quantity)) / SUM(o.net_amount * r.rate_to_cny) * 100 AS gross_margin_pct FROM sales_orders o JOIN dim_products p ON o.product_id = p.product_id JOIN exchange_rates r ON o.order_date = r.rate_date AND o.currency = r.currency WHERE o.order_status = 'completed'",
-      "data_source": "sales_orders JOIN dim_products JOIN exchange_rates",
-      "depends_on": ["毛利", "收入"],
-      "time_field": "o.order_date",
-      "filters": ["o.order_status = 'completed'"],
-      "notes": "结果为百分比数值，如 35.2 表示毛利率 35.2%"
-    },
-    {
-      "name": "期间费用",
-      "level": "原子指标",
-      "aliases": ["费用", "总费用", "运营费用", "期间费用合计"],
-      "definition": "企业日常经营的四大费用汇总：研发费用 + 销售费用 + 管理费用 + 财务费用。注意 selling_expense 已包含其子项（marketing/logistics/warranty），不可重复计算。",
-      "formula": "SUM(rd_expense + selling_expense + admin_expense + finance_expense)",
-      "sql_template": "SELECT SUM(rd_expense + selling_expense + admin_expense + finance_expense) AS total_expense FROM finance_expenses",
-      "data_source": "finance_expenses",
-      "depends_on": [],
-      "time_field": "expense_date",
-      "filters": [],
-      "notes": "selling_expense 是总项，包含 marketing_expense + logistics_expense + warranty_expense，汇总时只用总项"
-    },
-    {
-      "name": "利润",
-      "level": "复合指标",
-      "aliases": ["净利润", "经营利润", "profit", "营业利润"],
-      "definition": "企业经营利润 = 毛利 - 期间费用。需要跨两个数据源计算：订单相关（毛利）和费用表（期间费用）。",
-      "formula": "毛利 - 期间费用",
-      "sql_template": "需分两步查询：1) 计算毛利（from sales_orders）2) 计算期间费用（from finance_expenses）3) 相减得利润",
-      "data_source": "sales_orders + dim_products + exchange_rates + finance_expenses",
-      "depends_on": ["毛利", "期间费用"],
-      "time_field": "o.order_date / expense_date",
-      "filters": ["o.order_status = 'completed'"],
-      "notes": "利润计算涉及两个独立数据源，无法单一 SQL 完成，需分步计算后合并"
-    },
-    {
-      "name": "客单价",
-      "level": "派生指标",
-      "aliases": ["平均订单金额", "单均收入", "ARPO"],
-      "definition": "每笔已完成订单的平均收入金额（人民币）。",
-      "formula": "SUM(net_amount * rate_to_cny) / COUNT(DISTINCT order_id)",
-      "sql_template": "SELECT SUM(o.net_amount * r.rate_to_cny) / COUNT(DISTINCT o.order_id) AS avg_order_value FROM sales_orders o JOIN exchange_rates r ON o.order_date = r.rate_date AND o.currency = r.currency WHERE o.order_status = 'completed'",
-      "data_source": "sales_orders JOIN exchange_rates",
-      "depends_on": ["收入"],
-      "time_field": "o.order_date",
-      "filters": ["o.order_status = 'completed'"],
-      "notes": "分母用 COUNT(DISTINCT order_id) 确保不重复计数"
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ],
+      "notes": "口径已确定:不含税商品销售额(item_amount),不含运费、税费;排除 Canceled/Pending;按下单日汇率折算人民币。 item_amount 是不含税金额,tax_amount 不参与。",
+      "unit": "元"
     },
     {
       "name": "订单量",
       "level": "原子指标",
-      "aliases": ["订单数", "订单总数", "成交订单数"],
-      "definition": "已完成订单的数量。",
-      "formula": "COUNT(*) WHERE order_status = 'completed'",
-      "sql_template": "SELECT COUNT(*) AS order_count FROM sales_orders WHERE order_status = 'completed'",
-      "data_source": "sales_orders",
+      "aliases": [
+        "订单数",
+        "订单总数",
+        "出单量",
+        "订单笔数",
+        "单量"
+      ],
+      "definition": "有效订单的去重订单数。一个订单可含多个商品行,必须按 order_id 去重。",
+      "formula": "COUNT(DISTINCT o.order_id)",
+      "sql_template": "SELECT COUNT(DISTINCT o.order_id) AS order_count FROM amz_order_items o WHERE o.order_status NOT IN ('Canceled', 'Pending')",
+      "data_source": "amz_order_items",
       "depends_on": [],
-      "time_field": "order_date",
-      "filters": ["order_status = 'completed'"],
-      "notes": "必须过滤 completed 状态，排除 cancelled 和 pending"
-    },
-    {
-      "name": "研发费用率",
-      "level": "派生指标",
-      "aliases": ["研发投入比", "R&D费用率", "研发占比"],
-      "definition": "研发费用占总收入的百分比，反映企业研发投入强度。新能源企业通常在 8-15%。",
-      "formula": "SUM(rd_expense) / 收入 * 100",
-      "sql_template": "需分两步：1) SUM(rd_expense) from finance_expenses 2) 收入 from sales_orders 3) 两者相除",
-      "data_source": "finance_expenses + sales_orders + exchange_rates",
-      "depends_on": ["收入"],
-      "time_field": "expense_date / o.order_date",
-      "filters": [],
-      "notes": "跨数据源指标，需确保时间范围对齐"
-    },
-    {
-      "name": "销售费用率",
-      "level": "派生指标",
-      "aliases": ["销售费用占比", "selling_expense_ratio"],
-      "definition": "销售费用占总收入的百分比。",
-      "formula": "SUM(selling_expense) / 收入 * 100",
-      "sql_template": "需分两步计算",
-      "data_source": "finance_expenses + sales_orders + exchange_rates",
-      "depends_on": ["收入"],
-      "time_field": "expense_date / o.order_date",
-      "filters": [],
-      "notes": "selling_expense 是总项，已包含市场/物流/质保三个子项"
-    },
-    {
-      "name": "产品线收入",
-      "level": "派生指标",
-      "aliases": ["按产品线收入", "各产品线收入", "分产品线营收"],
-      "definition": "按产品线维度汇总的不含税收入。需要 JOIN 产品维度表获取 product_line 字段。",
-      "formula": "SUM(o.net_amount * r.rate_to_cny) GROUP BY p.product_line",
-      "sql_template": "SELECT p.product_line, SUM(o.net_amount * r.rate_to_cny) AS revenue FROM sales_orders o JOIN dim_products p ON o.product_id = p.product_id JOIN exchange_rates r ON o.order_date = r.rate_date AND o.currency = r.currency WHERE o.order_status = 'completed' GROUP BY p.product_line",
-      "data_source": "sales_orders JOIN dim_products JOIN exchange_rates",
-      "depends_on": ["收入"],
-      "time_field": "o.order_date",
-      "filters": ["o.order_status = 'completed'"],
-      "notes": "product_line 枚举值：动力电池-乘用车 / 动力电池-商用车 / 储能系统-电网级 / 储能系统-工商业 / 电池材料与回收"
-    },
-    {
-      "name": "区域收入",
-      "level": "派生指标",
-      "aliases": ["按区域收入", "各大区收入", "分区域营收", "市场收入"],
-      "definition": "按销售大区维度汇总的不含税收入。可直接用 sales_orders.region 字段，无需 JOIN 客户表。",
-      "formula": "SUM(o.net_amount * r.rate_to_cny) GROUP BY o.region",
-      "sql_template": "SELECT o.region, SUM(o.net_amount * r.rate_to_cny) AS revenue FROM sales_orders o JOIN exchange_rates r ON o.order_date = r.rate_date AND o.currency = r.currency WHERE o.order_status = 'completed' GROUP BY o.region",
-      "data_source": "sales_orders JOIN exchange_rates",
-      "depends_on": ["收入"],
-      "time_field": "o.order_date",
-      "filters": ["o.order_status = 'completed'"],
-      "notes": "region 是冗余字段，可直接从 sales_orders 取，无需 JOIN dim_customers"
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ],
+      "notes": "不要用 COUNT(*),明细表是订单商品行粒度。",
+      "unit": "单"
     },
     {
       "name": "销量",
       "level": "原子指标",
-      "aliases": ["出货量", "销售数量", "总销量"],
-      "definition": "已完成订单的产品数量汇总（单位：MWh 或套数）。",
-      "formula": "SUM(quantity) WHERE order_status = 'completed'",
-      "sql_template": "SELECT SUM(quantity) AS total_quantity FROM sales_orders WHERE order_status = 'completed'",
-      "data_source": "sales_orders",
+      "aliases": [
+        "销售件数",
+        "出货件数",
+        "销售数量",
+        "件数",
+        "卖了多少件",
+        "出货量"
+      ],
+      "definition": "有效订单的商品件数合计。",
+      "formula": "SUM(o.quantity)",
+      "sql_template": "SELECT SUM(o.quantity) AS units FROM amz_order_items o WHERE o.order_status NOT IN ('Canceled', 'Pending')",
+      "data_source": "amz_order_items",
       "depends_on": [],
-      "time_field": "order_date",
-      "filters": ["order_status = 'completed'"],
-      "notes": "单位取决于产品类型，动力电池通常用 MWh，储能系统用套"
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ],
+      "notes": "",
+      "unit": "件"
+    },
+    {
+      "name": "客单价",
+      "level": "派生指标",
+      "aliases": [
+        "平均订单金额",
+        "单均销售额",
+        "AOV",
+        "平均每单金额"
+      ],
+      "definition": "每笔有效订单的平均销售额(人民币)。",
+      "formula": "销售额 / 订单量",
+      "sql_template": "SELECT SUM(o.item_amount * r.rate_to_cny) / NULLIF(COUNT(DISTINCT o.order_id), 0) AS avg_order_value FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending')",
+      "data_source": "amz_order_items JOIN exchange_rates",
+      "depends_on": [
+        "销售额",
+        "订单量"
+      ],
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ],
+      "notes": "分母用 NULLIF 防止除零。",
+      "unit": "元"
+    },
+    {
+      "name": "商品成本",
+      "level": "原子指标",
+      "aliases": [
+        "销售成本",
+        "COGS",
+        "采购成本",
+        "货值成本",
+        "货物成本",
+        "进货成本"
+      ],
+      "definition": "已售商品的成本 = (采购成本 + 头程运费) × 销量,单位人民币。",
+      "formula": "SUM((p.unit_cost + p.head_freight_cost) * o.quantity)",
+      "sql_template": "SELECT SUM((p.unit_cost + p.head_freight_cost) * o.quantity) AS cogs_cny FROM amz_order_items o JOIN dim_products p ON o.store_id = p.store_id AND o.msku = p.msku WHERE o.order_status NOT IN ('Canceled', 'Pending')",
+      "data_source": "amz_order_items JOIN dim_products",
+      "depends_on": [],
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ],
+      "notes": "口径已确定:(unit_cost + head_freight_cost) × 销量,即采购成本加头程运费,取 dim_products 当前成本。dim_products 在 (store_id, msku) 上唯一,JOIN 不会放大。 dim_products 须在 (store_id, msku) 上唯一,否则会重复计算。",
+      "unit": "元"
+    },
+    {
+      "name": "平台费用",
+      "level": "原子指标",
+      "aliases": [
+        "亚马逊费用",
+        "平台扣费",
+        "佣金及FBA费用",
+        "Amazon fees",
+        "亚马逊扣费",
+        "FBA佣金"
+      ],
+      "definition": "结算数据中的销售佣金、FBA 配送费、仓储费合计(取正数表示成本),人民币。",
+      "formula": "-SUM(s.amount * r.rate_to_cny) WHERE fee_type IN ('commission','fba_fee','storage_fee')",
+      "sql_template": "SELECT -SUM(s.amount * r.rate_to_cny) AS fee_cny FROM amz_settlement s JOIN exchange_rates r ON s.posted_date = r.rate_date AND s.currency = r.currency WHERE s.fee_type IN ('commission', 'fba_fee', 'storage_fee')",
+      "data_source": "amz_settlement JOIN exchange_rates",
+      "depends_on": [],
+      "time_field": "s.posted_date",
+      "filters": [
+        "s.fee_type IN ('commission', 'fba_fee', 'storage_fee')"
+      ],
+      "notes": "口径已确定:结算表中 commission、fba_fee、storage_fee 三类的相反数(结算费用为负)。不含促销与退款。结算按入账日期,与下单日期不同期。 结算按入账日期,与订单日期不同期,按日期比较时会错位。",
+      "unit": "元"
+    },
+    {
+      "name": "广告花费",
+      "level": "原子指标",
+      "aliases": [
+        "广告费",
+        "广告支出",
+        "Ad Spend",
+        "广告成本",
+        "广告投入",
+        "ad spend",
+        "烧了多少广告费",
+        "广告预算花费"
+      ],
+      "definition": "广告日报中的广告花费合计,人民币。",
+      "formula": "SUM(a.spend * r.rate_to_cny)",
+      "sql_template": "SELECT SUM(a.spend * r.rate_to_cny) AS ad_spend_cny FROM amz_ads_daily a JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency",
+      "data_source": "amz_ads_daily JOIN exchange_rates",
+      "depends_on": [],
+      "time_field": "a.report_date",
+      "filters": [],
+      "notes": "口径已确定:以广告日报 spend 为准,不再加结算表中的广告扣费,避免重复。",
+      "unit": "元"
+    },
+    {
+      "name": "广告销售额",
+      "level": "原子指标",
+      "aliases": [
+        "广告订单销售额",
+        "Ad Sales",
+        "广告带来的销售额"
+      ],
+      "definition": "广告归因窗口内由广告带来的销售额,人民币。默认 7 天归因。",
+      "formula": "SUM(a.sales_7d * r.rate_to_cny)",
+      "sql_template": "SELECT SUM(a.sales_7d * r.rate_to_cny) AS ad_sales_cny FROM amz_ads_daily a JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency",
+      "data_source": "amz_ads_daily JOIN exchange_rates",
+      "depends_on": [],
+      "time_field": "a.report_date",
+      "filters": [],
+      "notes": "口径已确定:7 天归因广告销售额(sales_7d)。",
+      "unit": "元"
+    },
+    {
+      "name": "ACOS",
+      "level": "派生指标",
+      "aliases": [
+        "广告销售成本比",
+        "广告成本销售比",
+        "广告花费占广告销售额比",
+        "广告成本占比",
+        "ACoS"
+      ],
+      "definition": "广告花费占广告销售额的百分比。越低越好。",
+      "formula": "广告花费 / 广告销售额 * 100",
+      "sql_template": "SELECT SUM(a.spend * r.rate_to_cny) / NULLIF(SUM(a.sales_7d * r.rate_to_cny), 0) * 100 AS acos_pct FROM amz_ads_daily a JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency",
+      "data_source": "amz_ads_daily JOIN exchange_rates",
+      "depends_on": [
+        "广告花费",
+        "广告销售额"
+      ],
+      "time_field": "a.report_date",
+      "filters": [],
+      "notes": "结果为百分比数值,如 25.3 表示 25.3%。聚合后再相除,不能对每行 ACOS 取平均。",
+      "unit": "%"
+    },
+    {
+      "name": "ROAS",
+      "level": "派生指标",
+      "aliases": [
+        "广告投入产出比",
+        "广告回报率",
+        "广告投资回报",
+        "广告回报"
+      ],
+      "definition": "每 1 元广告花费带来的广告销售额,是 ACOS 的倒数。",
+      "formula": "广告销售额 / 广告花费",
+      "sql_template": "SELECT SUM(a.sales_7d * r.rate_to_cny) / NULLIF(SUM(a.spend * r.rate_to_cny), 0) AS roas FROM amz_ads_daily a JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency",
+      "data_source": "amz_ads_daily JOIN exchange_rates",
+      "depends_on": [
+        "广告花费",
+        "广告销售额"
+      ],
+      "time_field": "a.report_date",
+      "filters": [],
+      "notes": "结果为倍数,如 4.0 表示花 1 元带来 4 元广告销售额。",
+      "unit": "倍"
+    },
+    {
+      "name": "CPC",
+      "level": "派生指标",
+      "aliases": [
+        "平均点击成本",
+        "单次点击花费",
+        "点击单价"
+      ],
+      "definition": "平均每次广告点击的花费,人民币。",
+      "formula": "广告花费 / 点击量",
+      "sql_template": "SELECT SUM(a.spend * r.rate_to_cny) / NULLIF(SUM(a.clicks), 0) AS cpc_cny FROM amz_ads_daily a JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency",
+      "data_source": "amz_ads_daily JOIN exchange_rates",
+      "depends_on": [
+        "广告花费"
+      ],
+      "time_field": "a.report_date",
+      "filters": [],
+      "notes": "按人民币折算。若业务习惯看站点原币,需另指定。",
+      "unit": "元"
+    },
+    {
+      "name": "广告点击率",
+      "level": "派生指标",
+      "aliases": [
+        "CTR",
+        "点击率"
+      ],
+      "definition": "广告点击量占曝光量的百分比。",
+      "formula": "SUM(clicks) / SUM(impressions) * 100",
+      "sql_template": "SELECT SUM(a.clicks) / NULLIF(SUM(a.impressions), 0) * 100 AS ctr_pct FROM amz_ads_daily a",
+      "data_source": "amz_ads_daily",
+      "depends_on": [],
+      "time_field": "a.report_date",
+      "filters": [],
+      "notes": "",
+      "unit": "%"
+    },
+    {
+      "name": "广告转化率",
+      "level": "派生指标",
+      "aliases": [
+        "广告CVR",
+        "广告订单转化率"
+      ],
+      "definition": "广告订单数占广告点击量的百分比。",
+      "formula": "SUM(orders_7d) / SUM(clicks) * 100",
+      "sql_template": "SELECT SUM(a.orders_7d) / NULLIF(SUM(a.clicks), 0) * 100 AS ad_cvr_pct FROM amz_ads_daily a",
+      "data_source": "amz_ads_daily",
+      "depends_on": [],
+      "time_field": "a.report_date",
+      "filters": [],
+      "notes": "使用与广告销售额一致的归因窗口。",
+      "unit": "%"
+    },
+    {
+      "name": "TACOS",
+      "level": "复合指标",
+      "aliases": [
+        "总广告销售成本比",
+        "广告花费占总销售额比",
+        "广告费占比"
+      ],
+      "definition": "广告花费占全店总销售额(含自然订单)的百分比,衡量广告对整体销售的依赖程度。",
+      "formula": "广告花费 / 销售额 * 100",
+      "sql_template": "SELECT ad.ad_spend_cny / NULLIF(s.sales_cny, 0) * 100 AS tacos_pct FROM (SELECT SUM(a.spend * r.rate_to_cny) AS ad_spend_cny FROM amz_ads_daily a JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency) ad CROSS JOIN (SELECT SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending')) s",
+      "data_source": "amz_ads_daily + amz_order_items + exchange_rates",
+      "depends_on": [
+        "广告花费",
+        "销售额"
+      ],
+      "time_field": "a.report_date / o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ],
+      "notes": "跨表指标:时间范围条件需同时加到每个子查询里。 分子分母必须分别聚合后再相除,不能直接 JOIN 两张明细表(会重复放大)。",
+      "unit": "%"
+    },
+    {
+      "name": "毛利",
+      "level": "派生指标",
+      "aliases": [
+        "毛利润",
+        "销售毛利",
+        "gross_profit",
+        "毛利额"
+      ],
+      "definition": "销售额减去商品成本,反映产品本身的盈利能力,不含平台费用和广告。",
+      "formula": "销售额 - 商品成本",
+      "sql_template": "SELECT SUM(o.item_amount * r.rate_to_cny) - SUM((p.unit_cost + p.head_freight_cost) * o.quantity) AS gross_profit_cny FROM amz_order_items o JOIN dim_products p ON o.store_id = p.store_id AND o.msku = p.msku JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending')",
+      "data_source": "amz_order_items JOIN dim_products JOIN exchange_rates",
+      "depends_on": [
+        "销售额",
+        "商品成本"
+      ],
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ],
+      "notes": "口径已确定:毛利 = 销售额 − 商品成本,不扣平台费用和广告费(扣完后叫「利润」)。 各公司口径差异大,请在《口径确认》中明确。",
+      "unit": "元"
+    },
+    {
+      "name": "毛利率",
+      "level": "派生指标",
+      "aliases": [
+        "毛利润率",
+        "毛利占比",
+        "gross_margin"
+      ],
+      "definition": "毛利占销售额的百分比。",
+      "formula": "毛利 / 销售额 * 100",
+      "sql_template": "SELECT (SUM(o.item_amount * r.rate_to_cny) - SUM((p.unit_cost + p.head_freight_cost) * o.quantity)) / NULLIF(SUM(o.item_amount * r.rate_to_cny), 0) * 100 AS gross_margin_pct FROM amz_order_items o JOIN dim_products p ON o.store_id = p.store_id AND o.msku = p.msku JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending')",
+      "data_source": "amz_order_items JOIN dim_products JOIN exchange_rates",
+      "depends_on": [
+        "毛利",
+        "销售额"
+      ],
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ],
+      "notes": "结果为百分比数值。",
+      "unit": "%"
+    },
+    {
+      "name": "利润",
+      "level": "复合指标",
+      "aliases": [
+        "净利润",
+        "经营利润",
+        "净利",
+        "profit",
+        "贡献利润",
+        "赚了多少钱",
+        "赚多少",
+        "盈利"
+      ],
+      "definition": "毛利扣除平台费用和广告花费后的利润。是否再扣退款损失、固定费用见口径确认。",
+      "formula": "销售额 - 商品成本 - 平台费用 - 广告花费",
+      "sql_template": "SELECT COALESCE(s.sales_cny, 0) - COALESCE(c.cogs_cny, 0) - COALESCE(f.fee_cny, 0) - COALESCE(ad.ad_spend_cny, 0) AS profit_cny FROM (SELECT SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending')) s CROSS JOIN (SELECT SUM((p.unit_cost + p.head_freight_cost) * o.quantity) AS cogs_cny FROM amz_order_items o JOIN dim_products p ON o.store_id = p.store_id AND o.msku = p.msku WHERE o.order_status NOT IN ('Canceled', 'Pending')) c CROSS JOIN (SELECT -SUM(s.amount * r.rate_to_cny) AS fee_cny FROM amz_settlement s JOIN exchange_rates r ON s.posted_date = r.rate_date AND s.currency = r.currency WHERE s.fee_type IN ('commission', 'fba_fee', 'storage_fee')) f CROSS JOIN (SELECT SUM(a.spend * r.rate_to_cny) AS ad_spend_cny FROM amz_ads_daily a JOIN exchange_rates r ON a.report_date = r.rate_date AND a.currency = r.currency) ad",
+      "data_source": "amz_order_items + dim_products + amz_settlement + amz_ads_daily + exchange_rates",
+      "depends_on": [
+        "销售额",
+        "商品成本",
+        "平台费用",
+        "广告花费"
+      ],
+      "time_field": "o.purchase_date / s.posted_date / a.report_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ],
+      "notes": "口径已确定:贡献利润 = 销售额 − 商品成本 − 平台费用 − 广告花费;不含退货损失和固定费用。跨表指标,订单、结算、广告日期口径不同,短周期会有错位。 跨表指标:时间范围条件需同时加到每个子查询里。 模板已用 COALESCE 处理某一部分无数据的情况。",
+      "unit": "元"
+    },
+    {
+      "name": "会话数",
+      "level": "原子指标",
+      "aliases": [
+        "访问量",
+        "Sessions",
+        "流量",
+        "访客会话",
+        "访客数",
+        "UV"
+      ],
+      "definition": "Business Report 中的商品详情页会话数合计。",
+      "formula": "SUM(t.sessions)",
+      "sql_template": "SELECT SUM(t.sessions) AS sessions FROM amz_traffic_daily t",
+      "data_source": "amz_traffic_daily",
+      "depends_on": [],
+      "time_field": "t.report_date",
+      "filters": [],
+      "notes": "粒度为 ASIN×日期。父子 ASIN 汇总时注意是否重复。",
+      "unit": "次"
+    },
+    {
+      "name": "转化率",
+      "level": "派生指标",
+      "aliases": [
+        "Session转化率",
+        "订单转化率",
+        "Unit Session Percentage",
+        "CVR",
+        "购买转化率",
+        "订单转化",
+        "流量转化率",
+        "买家转化率"
+      ],
+      "definition": "下单件数占会话数的百分比(亚马逊 Unit Session Percentage 口径)。",
+      "formula": "SUM(units_ordered) / SUM(sessions) * 100",
+      "sql_template": "SELECT SUM(t.units_ordered) / NULLIF(SUM(t.sessions), 0) * 100 AS session_cvr_pct FROM amz_traffic_daily t",
+      "data_source": "amz_traffic_daily",
+      "depends_on": [
+        "会话数"
+      ],
+      "time_field": "t.report_date",
+      "filters": [],
+      "notes": "与「广告转化率」不同,后者基于广告点击。不要用订单表的销量除以会话数,口径与亚马逊后台不一致。",
+      "unit": "%"
+    },
+    {
+      "name": "Buy Box占比",
+      "level": "派生指标",
+      "aliases": [
+        "购物车占比",
+        "黄金购物车占比",
+        "Buy Box Percentage",
+        "购物车获得率",
+        "BuyBox"
+      ],
+      "definition": "按会话数加权的 Buy Box 获得比例。",
+      "formula": "SUM(buy_box_pct * sessions) / SUM(sessions)",
+      "sql_template": "SELECT SUM(t.buy_box_pct * t.sessions) / NULLIF(SUM(t.sessions), 0) AS buy_box_pct FROM amz_traffic_daily t",
+      "data_source": "amz_traffic_daily",
+      "depends_on": [
+        "会话数"
+      ],
+      "time_field": "t.report_date",
+      "filters": [],
+      "notes": "buy_box_pct 存 0-100 的百分数。必须加权,不能直接 AVG。",
+      "unit": "%"
+    },
+    {
+      "name": "退货率",
+      "level": "复合指标",
+      "aliases": [
+        "退货比例",
+        "退货占比",
+        "Return Rate"
+      ],
+      "definition": "同期退货件数占销量的百分比。",
+      "formula": "退货件数 / 销量 * 100",
+      "sql_template": "SELECT rt.return_units / NULLIF(sl.units, 0) * 100 AS return_rate_pct FROM (SELECT SUM(quantity) AS return_units FROM amz_returns) rt CROSS JOIN (SELECT SUM(o.quantity) AS units FROM amz_order_items o WHERE o.order_status NOT IN ('Canceled', 'Pending')) sl",
+      "data_source": "amz_returns + amz_order_items",
+      "depends_on": [
+        "销量"
+      ],
+      "time_field": "return_date / o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ],
+      "notes": "口径已确定:同期退货件数 ÷ 同期销量(非 cohort 口径)。退货有滞后,近期数据偏低。 跨表指标:时间范围条件需同时加到每个子查询里。 退货有滞后,近期数据偏低。",
+      "unit": "%"
+    },
+    {
+      "name": "FBA可售库存",
+      "level": "原子指标",
+      "aliases": [
+        "可售库存",
+        "FBA库存",
+        "在库库存",
+        "可售库存件数",
+        "库存量",
+        "现有库存",
+        "当前库存"
+      ],
+      "definition": "最新库存快照日的 FBA 可售件数合计。",
+      "formula": "SUM(available_qty) WHERE snapshot_date = 最新快照日",
+      "sql_template": "SELECT SUM(i.available_qty) AS available_units FROM amz_fba_inventory i WHERE i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)",
+      "data_source": "amz_fba_inventory",
+      "depends_on": [],
+      "time_field": "i.snapshot_date",
+      "filters": [
+        "i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)"
+      ],
+      "notes": "库存是快照数据,不能跨天相加。查询某一历史日期时,把条件改为 i.snapshot_date = 指定日期。",
+      "unit": "件"
+    },
+    {
+      "name": "可售天数",
+      "level": "复合指标",
+      "aliases": [
+        "库存可售天数",
+        "库存周转天数",
+        "Days of Supply",
+        "库存天数",
+        "库存还能卖几天",
+        "库存周转",
+        "断货风险",
+        "DOS"
+      ],
+      "definition": "当前 FBA 可售库存按近 30 天日均销量可以卖多少天。",
+      "formula": "FBA可售库存 / (近30天销量 / 30)",
+      "sql_template": "SELECT inv.available_units / NULLIF(sl.units_30d / 30, 0) AS days_of_supply FROM (SELECT SUM(i.available_qty) AS available_units FROM amz_fba_inventory i WHERE i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)) inv CROSS JOIN (SELECT SUM(o.quantity) AS units_30d FROM amz_order_items o WHERE o.order_status NOT IN ('Canceled', 'Pending') AND o.purchase_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) sl",
+      "data_source": "amz_fba_inventory + amz_order_items",
+      "depends_on": [
+        "FBA可售库存",
+        "销量"
+      ],
+      "time_field": "i.snapshot_date / o.purchase_date",
+      "filters": [
+        "i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)",
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ],
+      "notes": "口径已确定:最新快照可售库存 ÷ 近 30 天日均销量。按 SKU 维度计算时需在两个子查询里同时 GROUP BY msku。",
+      "unit": "天"
+    },
+    {
+      "name": "高库龄库存占比",
+      "level": "派生指标",
+      "aliases": [
+        "长库龄占比",
+        "库龄超180天占比",
+        "滞销库存占比",
+        "老库存占比",
+        "滞销占比",
+        "长库龄库存"
+      ],
+      "definition": "库龄 181 天及以上的库存件数占总库存件数的百分比(最新快照)。",
+      "formula": "(181-270天 + 271-365天 + 365天以上) / 全部库龄件数 * 100",
+      "sql_template": "SELECT SUM(i.age_181_270_qty + i.age_271_365_qty + i.age_365_plus_qty) / NULLIF(SUM(i.age_0_90_qty + i.age_91_180_qty + i.age_181_270_qty + i.age_271_365_qty + i.age_365_plus_qty), 0) * 100 AS aged_stock_pct FROM amz_fba_inventory i WHERE i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)",
+      "data_source": "amz_fba_inventory",
+      "depends_on": [],
+      "time_field": "i.snapshot_date",
+      "filters": [
+        "i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)"
+      ],
+      "notes": "口径已确定:库龄 181 天以上(181-270、271-365、365+ 三段)件数 ÷ 全部库龄件数,取最新快照。",
+      "unit": "%"
+    },
+    {
+      "name": "滞销库存金额",
+      "level": "派生指标",
+      "aliases": [
+        "高库龄库存金额",
+        "呆滞库存货值",
+        "长库龄货值",
+        "滞销货值",
+        "呆滞库存金额"
+      ],
+      "definition": "库龄 181 天及以上库存按单件成本(采购+头程)折算的金额,人民币。",
+      "formula": "SUM((age_181_270 + age_271_365 + age_365_plus) * (unit_cost + head_freight_cost))",
+      "sql_template": "SELECT SUM((i.age_181_270_qty + i.age_271_365_qty + i.age_365_plus_qty) * (p.unit_cost + p.head_freight_cost)) AS aged_stock_value_cny FROM amz_fba_inventory i JOIN dim_products p ON i.store_id = p.store_id AND i.msku = p.msku WHERE i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)",
+      "data_source": "amz_fba_inventory JOIN dim_products",
+      "depends_on": [
+        "高库龄库存占比"
+      ],
+      "time_field": "i.snapshot_date",
+      "filters": [
+        "i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)"
+      ],
+      "notes": "用成本估值,不是售价。",
+      "unit": "元"
+    },
+    {
+      "name": "回款额",
+      "level": "原子指标",
+      "aliases": [
+        "结算回款",
+        "到账金额",
+        "放款金额",
+        "亚马逊回款",
+        "回款",
+        "到账",
+        "放款"
+      ],
+      "definition": "结算数据中所有收支项合计(销售收入减去各项扣费后的净额),人民币。",
+      "formula": "SUM(s.amount * r.rate_to_cny)",
+      "sql_template": "SELECT SUM(s.amount * r.rate_to_cny) AS settlement_cny FROM amz_settlement s JOIN exchange_rates r ON s.posted_date = r.rate_date AND s.currency = r.currency",
+      "data_source": "amz_settlement JOIN exchange_rates",
+      "depends_on": [],
+      "time_field": "s.posted_date",
+      "filters": [],
+      "notes": "口径已确定:按入账日期(posted_date)汇总结算表全部 amount(含收入与费用的净额),不区分预留金。",
+      "unit": "元"
+    },
+    {
+      "name": "站点销售额",
+      "level": "派生指标",
+      "aliases": [
+        "按站点销售额",
+        "各站点销售额",
+        "分站点营收",
+        "各国家销售额",
+        "各国销售额",
+        "分站点销售",
+        "各国家销售"
+      ],
+      "definition": "按亚马逊站点(US/UK/DE 等)汇总的销售额,人民币。",
+      "formula": "SUM(o.item_amount * r.rate_to_cny) GROUP BY st.marketplace",
+      "sql_template": "SELECT st.marketplace, SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN dim_stores st ON o.store_id = st.store_id JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending') GROUP BY st.marketplace",
+      "data_source": "amz_order_items JOIN dim_stores JOIN exchange_rates",
+      "depends_on": [
+        "销售额"
+      ],
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ],
+      "notes": "marketplace 枚举值见 dim_stores 字段说明。",
+      "unit": "元"
+    },
+    {
+      "name": "ASIN销售额",
+      "level": "派生指标",
+      "aliases": [
+        "按ASIN销售额",
+        "各ASIN销售额",
+        "单品销售额",
+        "分商品销售额",
+        "商品销售额排行",
+        "各商品销售额",
+        "单品销量排行",
+        "畅销商品"
+      ],
+      "definition": "按 ASIN 汇总的销售额,人民币。",
+      "formula": "SUM(o.item_amount * r.rate_to_cny) GROUP BY o.asin",
+      "sql_template": "SELECT o.asin, SUM(o.item_amount * r.rate_to_cny) AS sales_cny FROM amz_order_items o JOIN exchange_rates r ON o.purchase_date = r.rate_date AND o.currency = r.currency WHERE o.order_status NOT IN ('Canceled', 'Pending') GROUP BY o.asin ORDER BY sales_cny DESC",
+      "data_source": "amz_order_items JOIN exchange_rates",
+      "depends_on": [
+        "销售额"
+      ],
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ],
+      "notes": "需要 TopN 时由问题决定 LIMIT。ASIN 与 MSKU 是一对多,按 SKU 看请改 GROUP BY o.msku。",
+      "unit": "元"
     }
   ]
 }

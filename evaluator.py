@@ -262,8 +262,12 @@ class Evaluator:
             # 去除 AS 别名
             item_clean = re.split(r'\s+AS\s+', item, maxsplit=1, flags=re.IGNORECASE)[0].strip()
 
-            # 聚合函数调用
-            if re.match(r'^\s*(?:COUNT|SUM|AVG|MAX|MIN)\s*\(', item_clean, re.IGNORECASE):
+            # 聚合函数调用（允许 COALESCE(SUM(...), 0) 形态：语义上仍是聚合）
+            if re.match(
+                r'^\s*(?:COALESCE\s*\(\s*)?(?:COUNT|SUM|AVG|MAX|MIN)\s*\(',
+                item_clean,
+                re.IGNORECASE,
+            ):
                 continue
             # 纯数字常量
             if re.match(r'^[\d+\-]?[\d]*\.?[\d]*$', item_clean):
@@ -305,7 +309,9 @@ if __name__ == "__main__":
     llm = LLMClient()
 
     def generate_sql(question: str) -> str:
-        system_msg, prompt = build_prompt(question, use_rules=True, use_guards=True)
+        system_msg, prompt = build_prompt(
+            question, use_rules=True, use_guards=True, use_schema_linking=True
+        )
         return llm.generate_sql(system_msg, prompt)
 
     path = sys.argv[1] if len(sys.argv) > 1 else "test_cases.json"

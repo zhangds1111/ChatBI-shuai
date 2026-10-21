@@ -1,54 +1,537 @@
 {
   "indicators": [
     {
-      "name": "收入",
-      "aliases": ["销售额", "营收", "销售收入"],
-      "definition": "不含税销售收入，财务口径的销售额",
-      "formula": "SUM(o.net_amount * r.rate_to_cny)",
-      "data_source": "sales_orders o JOIN exchange_rates r ON o.order_date = r.rate_date AND o.currency = r.currency",
+      "name": "销售额",
+      "aliases": [
+        "销售收入",
+        "营收",
+        "GMV",
+        "总销售额",
+        "收入",
+        "销量金额",
+        "卖了多少钱",
+        "卖了多少"
+      ],
+      "definition": "有效订单的不含税商品销售额,按下单日汇率折算为人民币。不含运费和税费。",
+      "formula": "SUM(o.item_amount * r.rate_to_cny)",
+      "data_source": "amz_order_items JOIN exchange_rates",
       "depends_on": [],
-      "time_field": "o.order_date",
-      "filters": ["o.order_status = 'completed'"]
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ]
     },
     {
-      "name": "销售成本",
-      "aliases": ["成本", "销售成本"],
-      "definition": "已售产品的实际成本，等于材料成本加人工成本乘以数量",
-      "formula": "SUM((p.material_cost + p.labor_cost) * o.quantity)",
-      "data_source": "sales_orders o JOIN dim_products p ON o.product_id = p.product_id",
+      "name": "订单量",
+      "aliases": [
+        "订单数",
+        "订单总数",
+        "出单量",
+        "订单笔数",
+        "单量"
+      ],
+      "definition": "有效订单的去重订单数。一个订单可含多个商品行,必须按 order_id 去重。",
+      "formula": "COUNT(DISTINCT o.order_id)",
+      "data_source": "amz_order_items",
       "depends_on": [],
-      "time_field": "o.order_date",
-      "filters": ["o.order_status = 'completed'"]
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ]
     },
     {
-      "name": "毛利",
-      "aliases": ["毛利润", "gross_profit"],
-      "definition": "销售收入减去销售成本",
-      "formula": "revenue - cost",
-      "data_source": "需同时关联 sales_orders、dim_products、exchange_rates",
-      "depends_on": ["收入", "销售成本"],
-      "time_field": "o.order_date",
-      "filters": ["o.order_status = 'completed'"]
+      "name": "销量",
+      "aliases": [
+        "销售件数",
+        "出货件数",
+        "销售数量",
+        "件数",
+        "卖了多少件",
+        "出货量"
+      ],
+      "definition": "有效订单的商品件数合计。",
+      "formula": "SUM(o.quantity)",
+      "data_source": "amz_order_items",
+      "depends_on": [],
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ]
     },
     {
-      "name": "期间费用",
-      "aliases": ["费用", "总费用"],
-      "definition": "企业日常经营发生的费用，包括研发、销售、管理、财务四大费用",
-      "formula": "SUM(rd_expense + selling_expense + admin_expense + finance_expense)",
-      "data_source": "finance_expenses",
+      "name": "客单价",
+      "aliases": [
+        "平均订单金额",
+        "单均销售额",
+        "AOV",
+        "平均每单金额"
+      ],
+      "definition": "每笔有效订单的平均销售额(人民币)。",
+      "formula": "销售额 / 订单量",
+      "data_source": "amz_order_items JOIN exchange_rates",
+      "depends_on": [
+        "销售额",
+        "订单量"
+      ],
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ]
+    },
+    {
+      "name": "商品成本",
+      "aliases": [
+        "销售成本",
+        "COGS",
+        "采购成本",
+        "货值成本",
+        "货物成本",
+        "进货成本"
+      ],
+      "definition": "已售商品的成本 = (采购成本 + 头程运费) × 销量,单位人民币。",
+      "formula": "SUM((p.unit_cost + p.head_freight_cost) * o.quantity)",
+      "data_source": "amz_order_items JOIN dim_products",
       "depends_on": [],
-      "time_field": "expense_date",
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ]
+    },
+    {
+      "name": "平台费用",
+      "aliases": [
+        "亚马逊费用",
+        "平台扣费",
+        "佣金及FBA费用",
+        "Amazon fees",
+        "亚马逊扣费",
+        "FBA佣金"
+      ],
+      "definition": "结算数据中的销售佣金、FBA 配送费、仓储费合计(取正数表示成本),人民币。",
+      "formula": "-SUM(s.amount * r.rate_to_cny) WHERE fee_type IN ('commission','fba_fee','storage_fee')",
+      "data_source": "amz_settlement JOIN exchange_rates",
+      "depends_on": [],
+      "time_field": "s.posted_date",
+      "filters": [
+        "s.fee_type IN ('commission', 'fba_fee', 'storage_fee')"
+      ]
+    },
+    {
+      "name": "广告花费",
+      "aliases": [
+        "广告费",
+        "广告支出",
+        "Ad Spend",
+        "广告成本",
+        "广告投入",
+        "ad spend",
+        "烧了多少广告费",
+        "广告预算花费"
+      ],
+      "definition": "广告日报中的广告花费合计,人民币。",
+      "formula": "SUM(a.spend * r.rate_to_cny)",
+      "data_source": "amz_ads_daily JOIN exchange_rates",
+      "depends_on": [],
+      "time_field": "a.report_date",
       "filters": []
     },
     {
+      "name": "广告销售额",
+      "aliases": [
+        "广告订单销售额",
+        "Ad Sales",
+        "广告带来的销售额"
+      ],
+      "definition": "广告归因窗口内由广告带来的销售额,人民币。默认 7 天归因。",
+      "formula": "SUM(a.sales_7d * r.rate_to_cny)",
+      "data_source": "amz_ads_daily JOIN exchange_rates",
+      "depends_on": [],
+      "time_field": "a.report_date",
+      "filters": []
+    },
+    {
+      "name": "ACOS",
+      "aliases": [
+        "广告销售成本比",
+        "广告成本销售比",
+        "广告花费占广告销售额比",
+        "广告成本占比",
+        "ACoS"
+      ],
+      "definition": "广告花费占广告销售额的百分比。越低越好。",
+      "formula": "广告花费 / 广告销售额 * 100",
+      "data_source": "amz_ads_daily JOIN exchange_rates",
+      "depends_on": [
+        "广告花费",
+        "广告销售额"
+      ],
+      "time_field": "a.report_date",
+      "filters": []
+    },
+    {
+      "name": "ROAS",
+      "aliases": [
+        "广告投入产出比",
+        "广告回报率",
+        "广告投资回报",
+        "广告回报"
+      ],
+      "definition": "每 1 元广告花费带来的广告销售额,是 ACOS 的倒数。",
+      "formula": "广告销售额 / 广告花费",
+      "data_source": "amz_ads_daily JOIN exchange_rates",
+      "depends_on": [
+        "广告花费",
+        "广告销售额"
+      ],
+      "time_field": "a.report_date",
+      "filters": []
+    },
+    {
+      "name": "CPC",
+      "aliases": [
+        "平均点击成本",
+        "单次点击花费",
+        "点击单价"
+      ],
+      "definition": "平均每次广告点击的花费,人民币。",
+      "formula": "广告花费 / 点击量",
+      "data_source": "amz_ads_daily JOIN exchange_rates",
+      "depends_on": [
+        "广告花费"
+      ],
+      "time_field": "a.report_date",
+      "filters": []
+    },
+    {
+      "name": "广告点击率",
+      "aliases": [
+        "CTR",
+        "点击率"
+      ],
+      "definition": "广告点击量占曝光量的百分比。",
+      "formula": "SUM(clicks) / SUM(impressions) * 100",
+      "data_source": "amz_ads_daily",
+      "depends_on": [],
+      "time_field": "a.report_date",
+      "filters": []
+    },
+    {
+      "name": "广告转化率",
+      "aliases": [
+        "广告CVR",
+        "广告订单转化率"
+      ],
+      "definition": "广告订单数占广告点击量的百分比。",
+      "formula": "SUM(orders_7d) / SUM(clicks) * 100",
+      "data_source": "amz_ads_daily",
+      "depends_on": [],
+      "time_field": "a.report_date",
+      "filters": []
+    },
+    {
+      "name": "TACOS",
+      "aliases": [
+        "总广告销售成本比",
+        "广告花费占总销售额比",
+        "广告费占比"
+      ],
+      "definition": "广告花费占全店总销售额(含自然订单)的百分比,衡量广告对整体销售的依赖程度。",
+      "formula": "广告花费 / 销售额 * 100",
+      "data_source": "amz_ads_daily + amz_order_items + exchange_rates",
+      "depends_on": [
+        "广告花费",
+        "销售额"
+      ],
+      "time_field": "a.report_date / o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ]
+    },
+    {
+      "name": "毛利",
+      "aliases": [
+        "毛利润",
+        "销售毛利",
+        "gross_profit",
+        "毛利额"
+      ],
+      "definition": "销售额减去商品成本,反映产品本身的盈利能力,不含平台费用和广告。",
+      "formula": "销售额 - 商品成本",
+      "data_source": "amz_order_items JOIN dim_products JOIN exchange_rates",
+      "depends_on": [
+        "销售额",
+        "商品成本"
+      ],
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ]
+    },
+    {
+      "name": "毛利率",
+      "aliases": [
+        "毛利润率",
+        "毛利占比",
+        "gross_margin"
+      ],
+      "definition": "毛利占销售额的百分比。",
+      "formula": "毛利 / 销售额 * 100",
+      "data_source": "amz_order_items JOIN dim_products JOIN exchange_rates",
+      "depends_on": [
+        "毛利",
+        "销售额"
+      ],
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ]
+    },
+    {
       "name": "利润",
-      "aliases": ["净利润", "经营利润", "profit"],
-      "definition": "企业经营利润，等于毛利减去期间费用",
-      "formula": "gross_profit - total_expense",
-      "data_source": "需跨 sales_orders、dim_products、exchange_rates、finance_expenses",
-      "depends_on": ["毛利", "期间费用"],
-      "time_field": "o.order_date / expense_date",
-      "filters": ["o.order_status = 'completed'"]
+      "aliases": [
+        "净利润",
+        "经营利润",
+        "净利",
+        "profit",
+        "贡献利润",
+        "赚了多少钱",
+        "赚多少",
+        "盈利"
+      ],
+      "definition": "毛利扣除平台费用和广告花费后的利润。是否再扣退款损失、固定费用见口径确认。",
+      "formula": "销售额 - 商品成本 - 平台费用 - 广告花费",
+      "data_source": "amz_order_items + dim_products + amz_settlement + amz_ads_daily + exchange_rates",
+      "depends_on": [
+        "销售额",
+        "商品成本",
+        "平台费用",
+        "广告花费"
+      ],
+      "time_field": "o.purchase_date / s.posted_date / a.report_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ]
+    },
+    {
+      "name": "会话数",
+      "aliases": [
+        "访问量",
+        "Sessions",
+        "流量",
+        "访客会话",
+        "访客数",
+        "UV"
+      ],
+      "definition": "Business Report 中的商品详情页会话数合计。",
+      "formula": "SUM(t.sessions)",
+      "data_source": "amz_traffic_daily",
+      "depends_on": [],
+      "time_field": "t.report_date",
+      "filters": []
+    },
+    {
+      "name": "转化率",
+      "aliases": [
+        "Session转化率",
+        "订单转化率",
+        "Unit Session Percentage",
+        "CVR",
+        "购买转化率",
+        "订单转化",
+        "流量转化率",
+        "买家转化率"
+      ],
+      "definition": "下单件数占会话数的百分比(亚马逊 Unit Session Percentage 口径)。",
+      "formula": "SUM(units_ordered) / SUM(sessions) * 100",
+      "data_source": "amz_traffic_daily",
+      "depends_on": [
+        "会话数"
+      ],
+      "time_field": "t.report_date",
+      "filters": []
+    },
+    {
+      "name": "Buy Box占比",
+      "aliases": [
+        "购物车占比",
+        "黄金购物车占比",
+        "Buy Box Percentage",
+        "购物车获得率",
+        "BuyBox"
+      ],
+      "definition": "按会话数加权的 Buy Box 获得比例。",
+      "formula": "SUM(buy_box_pct * sessions) / SUM(sessions)",
+      "data_source": "amz_traffic_daily",
+      "depends_on": [
+        "会话数"
+      ],
+      "time_field": "t.report_date",
+      "filters": []
+    },
+    {
+      "name": "退货率",
+      "aliases": [
+        "退货比例",
+        "退货占比",
+        "Return Rate"
+      ],
+      "definition": "同期退货件数占销量的百分比。",
+      "formula": "退货件数 / 销量 * 100",
+      "data_source": "amz_returns + amz_order_items",
+      "depends_on": [
+        "销量"
+      ],
+      "time_field": "return_date / o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ]
+    },
+    {
+      "name": "FBA可售库存",
+      "aliases": [
+        "可售库存",
+        "FBA库存",
+        "在库库存",
+        "可售库存件数",
+        "库存量",
+        "现有库存",
+        "当前库存"
+      ],
+      "definition": "最新库存快照日的 FBA 可售件数合计。",
+      "formula": "SUM(available_qty) WHERE snapshot_date = 最新快照日",
+      "data_source": "amz_fba_inventory",
+      "depends_on": [],
+      "time_field": "i.snapshot_date",
+      "filters": [
+        "i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)"
+      ]
+    },
+    {
+      "name": "可售天数",
+      "aliases": [
+        "库存可售天数",
+        "库存周转天数",
+        "Days of Supply",
+        "库存天数",
+        "库存还能卖几天",
+        "库存周转",
+        "断货风险",
+        "DOS"
+      ],
+      "definition": "当前 FBA 可售库存按近 30 天日均销量可以卖多少天。",
+      "formula": "FBA可售库存 / (近30天销量 / 30)",
+      "data_source": "amz_fba_inventory + amz_order_items",
+      "depends_on": [
+        "FBA可售库存",
+        "销量"
+      ],
+      "time_field": "i.snapshot_date / o.purchase_date",
+      "filters": [
+        "i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)",
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ]
+    },
+    {
+      "name": "高库龄库存占比",
+      "aliases": [
+        "长库龄占比",
+        "库龄超180天占比",
+        "滞销库存占比",
+        "老库存占比",
+        "滞销占比",
+        "长库龄库存"
+      ],
+      "definition": "库龄 181 天及以上的库存件数占总库存件数的百分比(最新快照)。",
+      "formula": "(181-270天 + 271-365天 + 365天以上) / 全部库龄件数 * 100",
+      "data_source": "amz_fba_inventory",
+      "depends_on": [],
+      "time_field": "i.snapshot_date",
+      "filters": [
+        "i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)"
+      ]
+    },
+    {
+      "name": "滞销库存金额",
+      "aliases": [
+        "高库龄库存金额",
+        "呆滞库存货值",
+        "长库龄货值",
+        "滞销货值",
+        "呆滞库存金额"
+      ],
+      "definition": "库龄 181 天及以上库存按单件成本(采购+头程)折算的金额,人民币。",
+      "formula": "SUM((age_181_270 + age_271_365 + age_365_plus) * (unit_cost + head_freight_cost))",
+      "data_source": "amz_fba_inventory JOIN dim_products",
+      "depends_on": [
+        "高库龄库存占比"
+      ],
+      "time_field": "i.snapshot_date",
+      "filters": [
+        "i.snapshot_date = (SELECT MAX(snapshot_date) FROM amz_fba_inventory)"
+      ]
+    },
+    {
+      "name": "回款额",
+      "aliases": [
+        "结算回款",
+        "到账金额",
+        "放款金额",
+        "亚马逊回款",
+        "回款",
+        "到账",
+        "放款"
+      ],
+      "definition": "结算数据中所有收支项合计(销售收入减去各项扣费后的净额),人民币。",
+      "formula": "SUM(s.amount * r.rate_to_cny)",
+      "data_source": "amz_settlement JOIN exchange_rates",
+      "depends_on": [],
+      "time_field": "s.posted_date",
+      "filters": []
+    },
+    {
+      "name": "站点销售额",
+      "aliases": [
+        "按站点销售额",
+        "各站点销售额",
+        "分站点营收",
+        "各国家销售额",
+        "各国销售额",
+        "分站点销售",
+        "各国家销售"
+      ],
+      "definition": "按亚马逊站点(US/UK/DE 等)汇总的销售额,人民币。",
+      "formula": "SUM(o.item_amount * r.rate_to_cny) GROUP BY st.marketplace",
+      "data_source": "amz_order_items JOIN dim_stores JOIN exchange_rates",
+      "depends_on": [
+        "销售额"
+      ],
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ]
+    },
+    {
+      "name": "ASIN销售额",
+      "aliases": [
+        "按ASIN销售额",
+        "各ASIN销售额",
+        "单品销售额",
+        "分商品销售额",
+        "商品销售额排行",
+        "各商品销售额",
+        "单品销量排行",
+        "畅销商品"
+      ],
+      "definition": "按 ASIN 汇总的销售额,人民币。",
+      "formula": "SUM(o.item_amount * r.rate_to_cny) GROUP BY o.asin",
+      "data_source": "amz_order_items JOIN exchange_rates",
+      "depends_on": [
+        "销售额"
+      ],
+      "time_field": "o.purchase_date",
+      "filters": [
+        "o.order_status NOT IN ('Canceled', 'Pending')"
+      ]
     }
   ]
 }

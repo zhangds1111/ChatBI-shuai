@@ -70,7 +70,7 @@ def test_chatbi_system_run_uses_runtime_factory_for_source_id():
     class FakeDB:
         last_query_info = {"duration_ms": 12.5, "slow_query": False, "explain_plan": []}
 
-        def execute(self, sql: str, user=None):
+        def execute(self, sql: str, user=None, **kwargs):
             captured["sql"] = sql
             captured["user"] = user
             return ["value"], [(1,)]

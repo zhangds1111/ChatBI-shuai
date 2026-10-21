@@ -4,7 +4,18 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from query_decomposer import QueryDecomposer, build_decomposition_prompt
+from query_decomposer import QueryDecomposer, build_decomposition_prompt, normalize_dimensions
+
+
+def test_normalize_dimensions_maps_aliases():
+    # 国家→站点、商品→ASIN、运营→运营负责人，去重保序
+    assert normalize_dimensions(["国家", "商品", "运营", "站点"]) == [
+        "站点",
+        "ASIN",
+        "运营负责人",
+    ]
+    # 未知词原样保留，交由校验报错
+    assert normalize_dimensions(["技术路线"]) == ["技术路线"]
 
 
 def test_build_decomposition_prompt_includes_schema_and_indicator_catalog():
@@ -14,7 +25,8 @@ def test_build_decomposition_prompt_includes_schema_and_indicator_catalog():
     assert "【可用分析维度】" in prompt
     assert "【可用指标】" in prompt
     assert "【常见分析类型拆解策略】" in prompt
-    assert "产品线" in prompt
+    assert "站点" in prompt
+    assert "ASIN" in prompt
     assert "利润" in prompt
 
 
@@ -84,7 +96,7 @@ def test_query_decomposer_retries_when_trend_plan_has_too_many_tasks():
                     "dimensions": ["月份"],
                     "metrics": ["利润"],
                 }
-                for i in range(1, 8)
+                for i in range(1, 9)  # 趋势分析上限 7，8 个触发打回
             ],
         },
         ensure_ascii=False,

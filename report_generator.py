@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from config import LLM_CONFIG
 from llm_client import LLMClient
+from tracing import traceable
 
 
 ReportTextGenerator = Callable[[str, str], str]
@@ -40,6 +41,7 @@ class ReportGenerator:
     def __init__(self, text_generator: ReportTextGenerator | None = None):
         self.text_generator = text_generator or self._build_default_text_generator()
 
+    @traceable(name="分析报告生成", run_type="chain")
     def generate(
         self,
         original_question: str,
@@ -160,7 +162,7 @@ class ReportGenerator:
             root_causes.append("部分步骤执行失败，当前归因只覆盖已成功返回的部分。")
 
         action_suggestions = [
-            "优先复核关键产品线、区域或费用项的波动来源。",
+            "优先复核站点、品类或 SKU 层面的波动来源。",
             "继续补充失败步骤或缺失维度，再迭代报告结论。",
         ]
         report = AnalysisReport(

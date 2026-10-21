@@ -57,8 +57,38 @@ APP_CONFIG = {
         "rules": os.getenv("FEATURE_RULES", "true").lower() == "true",
         "guards": os.getenv("FEATURE_GUARDS", "true").lower() == "true",
         "indicator_knowledge": os.getenv("FEATURE_INDICATOR_KNOWLEDGE", "true").lower() == "true",
-        "schema_linking": os.getenv("FEATURE_SCHEMA_LINKING", "false").lower() == "true",
+        "schema_linking": os.getenv("FEATURE_SCHEMA_LINKING", "true").lower() == "true",
         "indicator_rag": os.getenv("FEATURE_INDICATOR_RAG", "false").lower() == "true",
+    },
+    # ---- 安全（SQL 校验 / 行级权限 / 令牌）----
+    "security": {
+        # 返回行数上限：无 LIMIT 自动补齐，超过上限压到上限
+        "max_rows": int(os.getenv("MAX_ROWS", 1000)),
+        # 会话级执行超时（毫秒），每次查询前 SET SESSION max_execution_time
+        "query_timeout_ms": int(os.getenv("QUERY_TIMEOUT_MS", 30000)),
+        # 单条查询允许引用的最大表数 / 子查询嵌套深度
+        "max_tables_per_query": int(os.getenv("MAX_TABLES_PER_QUERY", 6)),
+        "max_subquery_depth": int(os.getenv("MAX_SUBQUERY_DEPTH", 5)),
+        # 表白名单、函数黑名单、敏感列等策略文件路径（相对项目根目录）
+        "policy_path": os.getenv("SECURITY_POLICY_PATH", "security_policy.json"),
+        # 表列元数据（供 ops 角色 SELECT * 展开非敏感列）
+        "table_columns_path": os.getenv("TABLE_COLUMNS_PATH", "field_metadata.json"),
+        # 令牌签名密钥（HMAC-SHA256），生产必配
+        "auth_secret": os.getenv("AUTH_SECRET", ""),
+        # 开发模式：true 时允许无令牌访问并以 demo_admin 身份执行；默认关闭
+        "allow_demo_admin": os.getenv("ALLOW_DEMO_ADMIN", "false").lower() == "true",
+        # dim_stores.owner -> store_id 映射缓存 TTL（秒），默认 10 分钟
+        "store_cache_ttl_seconds": int(os.getenv("STORE_CACHE_TTL_SECONDS", 600)),
+    },
+    # 仅作回显；实际开关由 langsmith 运行期读 LANGSMITH_TRACING 等环境变量决定
+    "tracing": {
+        "enabled": os.getenv(
+            "LANGSMITH_TRACING", os.getenv("LANGCHAIN_TRACING", "false")
+        ).lower()
+        == "true",
+        "project": os.getenv(
+            "LANGSMITH_PROJECT", os.getenv("LANGCHAIN_PROJECT", "chatbi")
+        ),
     },
 }
 
