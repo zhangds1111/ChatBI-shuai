@@ -51,6 +51,7 @@ class Evaluator:
         result = {
             "id": case.get("id", "unknown"),
             "category": case.get("category", "unknown"),
+            "difficulty": case.get("difficulty", "unknown"),
             "question": question,
             "expected_sql": expected_sql,
             "generated_sql": None,
@@ -126,16 +127,16 @@ class Evaluator:
         error_count = sum(1 for r in results if r["error"] is not None)
 
         # 按难度分类统计
-        categories = {}
+        difficulties = {}
         for r in results:
-            cat = r["category"]
-            if cat not in categories:
-                categories[cat] = {"total": 0, "correct": 0, "error": 0}
-            categories[cat]["total"] += 1
+            level = r.get("difficulty", "unknown")
+            if level not in difficulties:
+                difficulties[level] = {"total": 0, "correct": 0, "error": 0}
+            difficulties[level]["total"] += 1
             if r["execution_match"]:
-                categories[cat]["correct"] += 1
+                difficulties[level]["correct"] += 1
             if r["error"]:
-                categories[cat]["error"] += 1
+                difficulties[level]["error"] += 1
 
         lines = [
             "=" * 60,
@@ -149,16 +150,16 @@ class Evaluator:
             "按难度分类统计：",
         ]
 
-        for cat in ["simple", "medium", "complex"]:
-            if cat in categories:
-                stat = categories[cat]
+        for level in ["simple", "medium", "complex", "unknown"]:
+            if level in difficulties:
+                stat = difficulties[level]
                 acc = stat["correct"] / stat["total"] * 100 if stat["total"] > 0 else 0
-                lines.append(f"  {cat:8s}: {stat['correct']}/{stat['total']} = {acc:.1f}% (失败 {stat['error']})")
+                lines.append(f"  {level:8s}: {stat['correct']}/{stat['total']} = {acc:.1f}% (失败 {stat['error']})")
 
         lines.extend(["", "详细结果："])
         for r in results:
             status = "通过" if r["execution_match"] else ("失败" if r["error"] else "不匹配")
-            lines.append(f"\n[{r['id']}] {r['category']:8s} | {status}")
+            lines.append(f"\n[{r['id']}] {r.get('difficulty', 'unknown'):8s} ({r['category']}) | {status}")
             lines.append(f"  问题：{r['question']}")
             if r["error"]:
                 lines.append(f"  错误：{r['error']}")

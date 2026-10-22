@@ -217,12 +217,72 @@ def test_string_literals_do_not_trigger_blocks(manager: QuerySecurityManager):
 
 
 # ---------------------------------------------------------------------------
-# 验收 18：knowledge/test_cases.json 的 27 条 expected_sql 全部通过 admin 校验
+# 回归：MySQL 版本注释 /*! ... */ 绕过（依赖 sqlglot 重新序列化消除，升级版本时需发现变化）
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT /*!50000 SLEEP(3) */ 1",
+        "SELECT 1 /*!; DROP TABLE dim_stores */",
+    ],
+)
+def test_mysql_version_comment_bypass_neutralized(manager: QuerySecurityManager, sql: str):
+    secured = manager.secure_sql(sql, ADMIN)
+    assert "/*!" not in secured, f"版本注释未被消除，sqlglot 行为可能已变化: {secured}"
+    sqlglot.parse_one(secured, dialect="mysql")
+
+
+def test_error_based_injection_functions_blocked(manager: QuerySecurityManager):
+    """EXTRACTVALUE / UPDATEXML 报错注入函数在黑名单内。"""
+    with pytest.raises(SecurityError, match="EXTRACTVALUE"):
+        manager.secure_sql("SELECT EXTRACTVALUE(1, CONCAT(0x7e, VERSION()))", ADMIN)
+    with pytest.raises(SecurityError, match="UPDATEXML"):
+        manager.secure_sql("SELECT UPDATEXML(1, CONCAT(0x7e, VERSION()), 1)", ADMIN)
+
+
+# ---------------------------------------------------------------------------
+# 隐式笛卡尔积：FROM a, b 且没有任何连接条件时拒绝
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT o1.item_amount FROM amz_order_items o1, dim_stores o2",
+        "SELECT 1 FROM amz_order_items a CROSS JOIN dim_stores b",
+        "SELECT 1 FROM amz_order_items a, dim_stores b WHERE a.item_amount > 0",  # WHERE 未跨表
+    ],
+)
+def test_implicit_cartesian_product_blocked(manager: QuerySecurityManager, sql: str):
+    with pytest.raises(SecurityError, match="笛卡尔积"):
+        manager.secure_sql(sql, ADMIN)
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        # 自连接带 ON 的同比查询
+        "SELECT a.item_amount FROM amz_order_items a JOIN amz_order_items b ON a.store_id = b.store_id",
+        # 逗号连接 + WHERE 跨表连接条件
+        "SELECT o1.item_amount FROM amz_order_items o1, dim_stores o2 WHERE o1.store_id = o2.store_id",
+        # 单表无连接
+        "SELECT item_amount FROM amz_order_items",
+    ],
+)
+def test_joins_with_conditions_still_allowed(manager: QuerySecurityManager, sql: str):
+    secured = manager.secure_sql(sql, ADMIN)
+    assert secured
+
+
+# ---------------------------------------------------------------------------
+# 验收 18：test_cases.json（唯一来源）的 27 条 expected_sql 全部通过 admin 校验
 # ---------------------------------------------------------------------------
 
 
 def test_all_expected_sql_pass_admin_validation(manager: QuerySecurityManager):
-    cases = json.loads((PROJECT_ROOT / "knowledge" / "test_cases.json").read_text(encoding="utf-8"))
+    cases = json.loads((PROJECT_ROOT / "test_cases.json").read_text(encoding="utf-8"))
     assert len(cases) == 27
     for case in cases:
         secured = manager.secure_sql(case["expected_sql"], ADMIN)
@@ -288,8 +348,8 @@ def test_ops_query_wrapped_with_store_filter(manager: QuerySecurityManager):
     [
         # 反引号
         ("SELECT item_amount FROM `amz_order_items`", 1),
-        # 逗号连接
-        ("SELECT o1.item_amount FROM amz_order_items o1, dim_stores o2", 2),
+        # 逗号连接（带 WHERE 跨表连接条件，非笛卡尔积）
+        ("SELECT o1.item_amount FROM amz_order_items o1, dim_stores o2 WHERE o1.store_id = o2.store_id", 2),
         # UNION 第二段
         ("SELECT store_id FROM dim_stores UNION SELECT store_id FROM amz_order_items", 2),
         # 子查询
@@ -318,6 +378,72 @@ def test_ops_wraps_every_table_occurrence(
 def test_exchange_rates_not_wrapped(manager: QuerySecurityManager):
     secured = manager.secure_sql("SELECT * FROM exchange_rates LIMIT 5", OPS_A)
     assert "store_id" not in secured
+
+
+# ---------------------------------------------------------------------------
+# CTE 不得与数据表同名（防止借同名 CTE 绕过行级过滤 / 表白名单）
+# ---------------------------------------------------------------------------
+
+_ATTACK_CTE_SQL = (
+    "WITH amz_order_items AS (SELECT * FROM amz_order_items) "
+    "SELECT SUM(item_amount) FROM amz_order_items"
+)
+
+
+def test_cte_named_like_row_level_table_blocked_for_ops(manager: QuerySecurityManager):
+    with pytest.raises(SecurityError, match="CTE 名称不得与数据表同名"):
+        manager.secure_sql(_ATTACK_CTE_SQL, OPS_A)
+
+
+def test_cte_named_like_table_blocked_for_admin(manager: QuerySecurityManager):
+    with pytest.raises(SecurityError, match="CTE 名称不得与数据表同名"):
+        manager.secure_sql(_ATTACK_CTE_SQL, ADMIN)
+
+
+def test_cte_name_collision_is_case_insensitive(manager: QuerySecurityManager):
+    sql = (
+        "WITH AMZ_ORDER_ITEMS AS (SELECT * FROM amz_order_items) "
+        "SELECT SUM(item_amount) FROM AMZ_ORDER_ITEMS"
+    )
+    with pytest.raises(SecurityError, match="CTE 名称不得与数据表同名"):
+        manager.secure_sql(sql, ADMIN)
+
+
+def test_cte_name_collision_inside_subquery_blocked(manager: QuerySecurityManager):
+    sql = (
+        "SELECT * FROM (WITH amz_order_items AS (SELECT 1) "
+        "SELECT * FROM amz_order_items) t"
+    )
+    with pytest.raises(SecurityError, match="CTE 名称不得与数据表同名"):
+        manager.secure_sql(sql, ADMIN)
+
+
+def test_recursive_cte_name_collision_blocked(manager: QuerySecurityManager):
+    sql = (
+        "WITH RECURSIVE amz_order_items AS ("
+        "SELECT 1 AS n UNION SELECT n + 1 FROM amz_order_items WHERE n < 3"
+        ") SELECT * FROM amz_order_items"
+    )
+    with pytest.raises(SecurityError, match="CTE 名称不得与数据表同名"):
+        manager.secure_sql(sql, ADMIN)
+
+
+def test_renamed_cte_still_row_filtered_for_ops(manager: QuerySecurityManager):
+    secured = manager.secure_sql(
+        "WITH x AS (SELECT * FROM amz_order_items) SELECT SUM(item_amount) FROM x",
+        OPS_A,
+    )
+    assert "store_id IN" in secured
+    assert re.search(r"store_id IN \('US01',\s*'CA01'\)", secured)
+
+
+def test_renamed_cte_allowed_for_admin_without_store_filter(manager: QuerySecurityManager):
+    secured = manager.secure_sql(
+        "WITH x AS (SELECT * FROM amz_order_items) SELECT SUM(item_amount) FROM x",
+        ADMIN,
+    )
+    assert secured
+    assert "store_id IN" not in secured
 
 
 def test_ops_with_empty_store_list_rejected(store_directory: StoreDirectory):

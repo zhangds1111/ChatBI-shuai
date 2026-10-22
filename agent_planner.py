@@ -23,7 +23,15 @@ from main import ChatBISystem, _sse_event
 from query_decomposer import DecompositionPlan, DecomposedTask, QueryDecomposer
 from report_generator import ReportGenerator
 from security import UserContext
-from tracing import reduce_sse, reduce_step_events, traceable
+from tracing import (
+    reduce_sse,
+    reduce_step_events,
+    traceable,
+    trim_agent_run_outputs,
+    trim_step_execute_inputs,
+    trim_step_result_outputs,
+    trim_step_results_inputs,
+)
 
 
 class PlanStep(BaseModel):
@@ -488,7 +496,12 @@ class StepExecutor:
             **self.chatbi_run_options,
         )
 
-    @traceable(name="步骤执行", run_type="chain")
+    @traceable(
+        name="步骤执行",
+        run_type="chain",
+        process_inputs=trim_step_execute_inputs,
+        process_outputs=trim_step_result_outputs,
+    )
     def _execute_with_retry(
         self,
         step: PlanStep,
@@ -689,7 +702,11 @@ class StepExecutor:
 class ResultSummarizer:
     """把多步执行结果收敛为统一摘要。"""
 
-    @traceable(name="结果汇总", run_type="chain")
+    @traceable(
+        name="结果汇总",
+        run_type="chain",
+        process_inputs=trim_step_results_inputs,
+    )
     def summarize(
         self,
         original_question: str,
@@ -787,7 +804,11 @@ class PlanAndExecuteAgent:
         self.summarizer = summarizer or ResultSummarizer()
         self.report_generator = report_generator or ReportGenerator()
 
-    @traceable(name="智能体执行链路", run_type="chain")
+    @traceable(
+        name="智能体执行链路",
+        run_type="chain",
+        process_outputs=trim_agent_run_outputs,
+    )
     def run(
         self,
         user_question: str,

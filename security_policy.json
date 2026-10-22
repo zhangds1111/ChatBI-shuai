@@ -22,7 +22,9 @@
     "LOAD_FILE",
     "GET_LOCK",
     "RELEASE_LOCK",
-    "UUID_SHORT"
+    "UUID_SHORT",
+    "EXTRACTVALUE",
+    "UPDATEXML"
   ],
   "restricted_columns": {
     "dim_products": ["unit_cost", "head_freight_cost"]

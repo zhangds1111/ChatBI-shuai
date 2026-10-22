@@ -46,6 +46,9 @@ DEFAULT_FORBIDDEN_FUNCTIONS = (
     "GET_LOCK",
     "RELEASE_LOCK",
     "UUID_SHORT",
+    # 报错注入函数（error-based SQLi）
+    "EXTRACTVALUE",
+    "UPDATEXML",
 )
 DEFAULT_MASKED_COLUMNS = ("customer_phone", "customer_email")
 
@@ -374,8 +377,10 @@ class QuerySecurityManager:
         self._check_forbidden_nodes(tree)
         self._check_functions(tree)
         cte_names = self._collect_cte_names(tree)
+        self._check_cte_name_collision(cte_names)
         self._check_tables(tree, cte_names)
         self._check_size_limits(tree, cte_names)
+        self._check_implicit_cartesian(tree)
         self._check_restricted_columns(tree, role)
 
         if role == "ops":
@@ -499,6 +504,19 @@ class QuerySecurityManager:
             if cte.alias_or_name
         }
 
+    def _check_cte_name_collision(self, cte_names: set[str]) -> None:
+        """禁止 CTE 与数据表同名（对所有角色一致生效）。
+
+        同名 CTE 会让 _check_tables / _wrap_row_level_tables 把 CTE 内部对真实表
+        的引用误当作 CTE 跳过，运营角色可借此绕过行级过滤看到全部店铺数据。
+        任何 CTE 名称（统一小写）命中表白名单 / 禁止 schema / 行级权限表即拒绝。
+        WITH RECURSIVE 与嵌套在子查询里的 CTE 由 tree.find_all(exp.CTE) 一并覆盖。
+        """
+        protected = self.allowed_tables | self.forbidden_schemas | self.row_level_tables
+        for name in sorted(cte_names):
+            if name in protected:
+                raise SecurityError(f"CTE 名称不得与数据表同名：{name}")
+
     def _check_tables(self, tree: exp.Expression, cte_names: set[str]) -> None:
         for table in tree.find_all(exp.Table):
             qualified = table.sql(dialect="mysql")
@@ -539,6 +557,62 @@ class QuerySecurityManager:
             raise SecurityError(
                 f"子查询嵌套深度 {max_depth} 超过上限 {self.max_depth}，请简化查询。"
             )
+
+    def _check_implicit_cartesian(self, tree: exp.Expression) -> None:
+        """拒绝真实表之间无连接条件的隐式笛卡尔积（FROM a, b 且无任何跨表关联）。
+
+        自连接 / 逗号连接只要 ON 或 WHERE 里有跨表连接条件即合法（同比、对比查询不受影响）。
+        单行聚合子查询之间的 CROSS JOIN（如 独立汇总后再横拼）是合法分析模式，不在此限。
+        """
+        for select in tree.find_all(exp.Select):
+            real_sources = [
+                source for source in self._sources_of_select(select)
+                if isinstance(source, exp.Table)
+            ]
+            if len(real_sources) < 2:
+                continue
+            source_names = {
+                name
+                for name in (self._source_name(source).lower() for source in real_sources)
+                if name
+            }
+            conditions: list[exp.Expression] = []
+            for join in select.args.get("joins") or []:
+                for key in ("on", "using"):
+                    cond = join.args.get(key)
+                    if cond is not None:
+                        conditions.append(cond)
+            where = select.args.get("where")
+            if where is not None:
+                conditions.append(where.this if isinstance(where, exp.Where) else where)
+            if any(
+                self._condition_links_sources(cond, source_names) for cond in conditions
+            ):
+                continue
+            raise SecurityError(
+                "检测到无连接条件的隐式笛卡尔积（FROM a, b 且没有任何跨表连接条件），"
+                "请补充 ON 或 WHERE 连接条件。"
+            )
+
+    @staticmethod
+    def _source_name(source: exp.Expression) -> str:
+        if isinstance(source, exp.Table):
+            return source.alias or source.name
+        return getattr(source, "alias", "") or ""
+
+    @staticmethod
+    def _condition_links_sources(
+        condition: exp.Expression, source_names: set[str]
+    ) -> bool:
+        """判断单个 ON/WHERE 谓词是否同时引用了两个以上不同数据源（即连接条件）。"""
+        seen: set[str] = set()
+        for column in condition.find_all(exp.Column):
+            qualifier = (column.table or "").lower()
+            if qualifier and qualifier in source_names:
+                seen.add(qualifier)
+            elif not qualifier:
+                return True  # 裸列名无法归属，保守放行
+        return len(seen) >= 2
 
     def _check_restricted_columns(self, tree: exp.Expression, role: str) -> None:
         if role != "ops" or not self.restricted_columns:

@@ -18,7 +18,7 @@ import pymysql
 
 from config import APP_CONFIG, DB_RUNTIME_CONFIG, get_database_source_config
 from security import QuerySecurityManager, SecurityError, UserContext
-from tracing import traceable
+from tracing import traceable, trim_execute_inputs, trim_execute_outputs
 
 logger = logging.getLogger("chatbi.database")
 # 审计日志：JSON 行，只记录访问轨迹，不记录结果数据
@@ -145,7 +145,12 @@ class DatabaseClient:
                 except Exception as exc:  # noqa: BLE001 - 数据库暂不可用时延迟到首次查询再取
                     logger.warning("Store owner map prefetch failed: %s", exc)
 
-    @traceable(name="SQL执行", run_type="tool")
+    @traceable(
+        name="SQL执行",
+        run_type="tool",
+        process_inputs=trim_execute_inputs,
+        process_outputs=trim_execute_outputs,
+    )
     def execute(
         self,
         sql: str,

@@ -7,13 +7,18 @@
 
 from typing import List, Tuple
 
-from tracing import traceable
+from tracing import traceable, trim_format_inputs, trim_format_outputs
 
 
 class ResultFormatter:
     """结果格式化器"""
 
-    @traceable(name="结果格式化", run_type="tool")
+    @traceable(
+        name="结果格式化",
+        run_type="tool",
+        process_inputs=trim_format_inputs,
+        process_outputs=trim_format_outputs,
+    )
     def format(self, columns: List[str], results: List[tuple]) -> str:
         """
         将查询结果格式化为字符串表格

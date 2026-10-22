@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from config import LLM_CONFIG
 from llm_client import LLMClient
-from tracing import traceable
+from tracing import traceable, trim_step_results_inputs
 
 
 ReportTextGenerator = Callable[[str, str], str]
@@ -41,7 +41,11 @@ class ReportGenerator:
     def __init__(self, text_generator: ReportTextGenerator | None = None):
         self.text_generator = text_generator or self._build_default_text_generator()
 
-    @traceable(name="分析报告生成", run_type="chain")
+    @traceable(
+        name="分析报告生成",
+        run_type="chain",
+        process_inputs=trim_step_results_inputs,
+    )
     def generate(
         self,
         original_question: str,
@@ -125,7 +129,8 @@ class ReportGenerator:
             "step_name": step_result.get("step_name"),
             "status": step_result.get("status"),
             "success": step_result.get("success"),
-            "formatted": step_result.get("formatted"),
+            # formatted 可能是整表文本：只保留一行摘要，云端 LLM 只收少量聚合结果
+            "formatted": ReportGenerator._pick_step_brief(step_result),
             "result_reference": step_result.get("result_reference"),
             "rows_preview": rows[:3],
             "error": step_result.get("error"),

@@ -4,7 +4,7 @@
 用法：
     uv run python run_eval.py                          # 默认 test_cases.json，标签=时间戳
     uv run python run_eval.py --tag baseline           # 结果存 eval_results/baseline_*
-    uv run python run_eval.py --cases 111/test_cases.json --tag after
+    uv run python run_eval.py --cases test_cases.json --tag after
 
 输出：
     eval_results/<tag>_report.txt    文本报告（与 evaluator.generate_report 一致）

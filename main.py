@@ -15,6 +15,7 @@
 
 import datetime
 import json
+import os
 import re
 import sys
 from decimal import Decimal
@@ -31,7 +32,13 @@ from query_parser import QueryParser
 from result_formatter import ResultFormatter
 from runtime_factory import build_runtime
 from security import SecurityError, UserContext
-from tracing import reduce_sse, traceable, trim_context_inputs, trim_query_outputs
+from tracing import (
+    reduce_sse,
+    traceable,
+    trim_context_inputs,
+    trim_query_outputs,
+    trim_run_inputs,
+)
 
 
 class ChatBISystem:
@@ -110,9 +117,166 @@ class ChatBISystem:
 
         return detected_indicators, indicator_block
 
+    # ---- 执行报错 → 带错误信息让 LLM 重写 → 有限次重试 ----
+
+    # 可修复错误码：字段不存在(1054)、字段有歧义(1052)、GROUP BY 不合规(1055)、聚合函数误用(1111)
+    REPAIRABLE_ERROR_CODES = {1054, 1052, 1055, 1111}
+    # 这些错误与 SQL 文本无关，重写无意义，一律不重试
+    NON_REPAIRABLE_ERROR_TYPES = {"connection_error", "query_timeout", "permission_denied"}
+
+    def _sql_repair_max_retries(self) -> int:
+        raw = os.getenv("SQL_REPAIR_MAX_RETRIES")
+        if raw is not None and raw.strip():
+            try:
+                return max(0, int(raw))
+            except ValueError:
+                pass
+        return max(0, int(self.app_config.get("sql_repair_max_retries", 2)))
+
+    def _is_repairable_error(self, exc: Exception) -> bool:
+        """只有可修复错误（语法/字段/聚合类）才让 LLM 重写重试。
+
+        SecurityError 不重试（避免用安全拒绝探测系统）；connection_error、
+        query_timeout、permission_denied 和 LLM 调用失败一律不重试。
+        """
+        if isinstance(exc, SecurityError) or not isinstance(exc, QueryExecutionError):
+            return False
+        if exc.error_type in self.NON_REPAIRABLE_ERROR_TYPES:
+            return False
+        if exc.error_type == "sql_syntax":
+            return True
+        code = exc.metadata.get("error_code")
+        try:
+            return int(code) in self.REPAIRABLE_ERROR_CODES
+        except (TypeError, ValueError):
+            return False
+
+    @staticmethod
+    def _build_repair_prompt(prompt: str, sql: str, exc: QueryExecutionError) -> str:
+        raw_error = str(exc.metadata.get("raw_error") or exc)
+        if len(raw_error) > 500:
+            raw_error = raw_error[:500]
+        return (
+            f"{prompt}\n\n"
+            f"【SQL 执行失败】\n"
+            f"上一次生成的 SQL：{sql}\n"
+            f"数据库报错：{raw_error}\n"
+            f"请只修正导致报错的问题，重新输出完整 SQL。"
+        )
+
+    def _execute_sql_with_repair(
+        self,
+        *,
+        runtime,
+        user_question: str,
+        sql: str,
+        system_msg: str,
+        prompt: str,
+        user_context: UserContext,
+        time_issue: str | None = None,
+    ) -> Generator[tuple[str, dict], None, dict]:
+        """执行 SQL；可修复报错时带错误信息让 LLM 重写并有限次重试。
+
+        每次执行都走 db.execute 的完整安全校验与审计日志；每次重写后重新跑
+        check_time_bounds / check_date_year，保证重写没有引入时间错误。
+
+        生成器协议：每次重写 yield ("sql_rewrite", {"issue", "sql"}) 供流式路径
+        推送事件；return 最终执行结果 dict（status / sql / columns / results /
+        db_info / exception / error / error_type / error_meta / time_issue /
+        sql_repair_attempts / sql_repair_errors）。
+        """
+        max_retries = self._sql_repair_max_retries()
+        repair_attempts = 0
+        repair_errors: list[str] = []
+        current_sql = sql
+        current_time_issue = time_issue
+
+        while True:
+            try:
+                columns, results = runtime.db.execute(
+                    current_sql, user=user_context, question=user_question
+                )
+                db_info = getattr(runtime.db, "last_query_info", {})
+                return {
+                    "status": "success",
+                    "sql": current_sql,
+                    "columns": columns,
+                    "results": results,
+                    "db_info": db_info,
+                    "time_issue": current_time_issue,
+                    "sql_repair_attempts": repair_attempts,
+                    "sql_repair_errors": repair_errors,
+                }
+            except SecurityError as e:
+                repair_errors.append("security")
+                return {
+                    "status": "security",
+                    "sql": current_sql,
+                    "exception": e,
+                    "error": str(e),
+                    "error_type": "security",
+                    "time_issue": current_time_issue,
+                    "sql_repair_attempts": repair_attempts,
+                    "sql_repair_errors": repair_errors,
+                }
+            except QueryExecutionError as e:
+                repair_errors.append(e.error_type)
+                if repair_attempts >= max_retries or not self._is_repairable_error(e):
+                    return {
+                        "status": "query",
+                        "sql": current_sql,
+                        "exception": e,
+                        "error": str(e),
+                        "error_type": f"database_{e.error_type}",
+                        "error_meta": e.metadata,
+                        "time_issue": current_time_issue,
+                        "sql_repair_attempts": repair_attempts,
+                        "sql_repair_errors": repair_errors,
+                    }
+                try:
+                    new_sql = runtime.llm.generate_sql(
+                        system_msg,
+                        self._build_repair_prompt(prompt, current_sql, e),
+                    )
+                except Exception:
+                    # LLM 调用失败：不再重试，返回最后一次执行错误
+                    return {
+                        "status": "query",
+                        "sql": current_sql,
+                        "exception": e,
+                        "error": str(e),
+                        "error_type": f"database_{e.error_type}",
+                        "error_meta": e.metadata,
+                        "time_issue": current_time_issue,
+                        "sql_repair_attempts": repair_attempts,
+                        "sql_repair_errors": repair_errors,
+                    }
+                repair_attempts += 1
+                current_sql = new_sql
+                current_time_issue = check_time_bounds(
+                    user_question, current_sql
+                ) or check_date_year(user_question, current_sql)
+                yield "sql_rewrite", {
+                    "issue": f"执行报错重写：{e.error_type}",
+                    "sql": current_sql,
+                }
+            except Exception as e:
+                repair_errors.append("database")
+                return {
+                    "status": "error",
+                    "sql": current_sql,
+                    "exception": e,
+                    "error": str(e),
+                    "error_type": "database",
+                    "time_issue": current_time_issue,
+                    "sql_repair_attempts": repair_attempts,
+                    "sql_repair_errors": repair_errors,
+                }
+
     @traceable(
         name="问答链路",
         run_type="chain",
+        process_inputs=trim_run_inputs,
         process_outputs=trim_query_outputs,
     )
     def run(
@@ -225,10 +389,42 @@ class ChatBISystem:
                 pass  # 重写失败则保留原 SQL，由执行层/评测暴露问题
             time_issue = check_time_bounds(user_question, sql) or check_date_year(user_question, sql)
 
-        # 5. 执行 SQL
-        try:
-            columns, results = runtime.db.execute(sql, user=user_context, question=user_question)
-            db_info = getattr(runtime.db, "last_query_info", {})
+        # 5. 执行 SQL（可修复报错时带错误信息让 LLM 重写并有限次重试）
+        execution = _drain_execution_events(
+            self._execute_sql_with_repair(
+                runtime=runtime,
+                user_question=user_question,
+                sql=sql,
+                system_msg=system_msg,
+                prompt=prompt,
+                user_context=user_context,
+                time_issue=time_issue,
+            )
+        )
+        sql = execution["sql"]
+        time_issue = execution["time_issue"]
+        repair_meta = {
+            "sql_repair_attempts": execution["sql_repair_attempts"],
+            "sql_repair_errors": execution["sql_repair_errors"],
+        }
+        base_meta = {
+            "detected_indicators": detected_indicators,
+            "model": LLM_CONFIG["model"],
+            "used_few_shot": use_few_shot,
+            "used_rules": use_rules,
+            "used_guards": use_guards,
+            "used_indicator_knowledge": use_indicator_knowledge,
+            "used_schema_linking": use_schema_linking,
+            "used_indicator_rag": use_indicator_rag,
+            "source_id": runtime.source_id,
+            "security_role": user_context.role,
+            "security_operator": user_context.operator_name,
+            **repair_meta,
+        }
+        if execution["status"] == "success":
+            columns = execution["columns"]
+            results = execution["results"]
+            db_info = execution["db_info"]
             formatted = runtime.formatter.format(columns, results)
             return {
                 "success": True,
@@ -237,17 +433,7 @@ class ChatBISystem:
                 "results": results,
                 "formatted": formatted,
                 "metadata": {
-                    "detected_indicators": detected_indicators,
-                    "model": LLM_CONFIG["model"],
-                    "used_few_shot": use_few_shot,
-                    "used_rules": use_rules,
-                    "used_guards": use_guards,
-                    "used_indicator_knowledge": use_indicator_knowledge,
-                    "used_schema_linking": use_schema_linking,
-                    "used_indicator_rag": use_indicator_rag,
-                    "source_id": runtime.source_id,
-                    "security_role": user_context.role,
-                    "security_operator": user_context.operator_name,
+                    **base_meta,
                     "row_count": len(results),
                     "db_duration_ms": db_info.get("duration_ms"),
                     "db_slow_query": db_info.get("slow_query", False),
@@ -255,75 +441,32 @@ class ChatBISystem:
                     "db_truncated": db_info.get("truncated", False),
                     "time_bounds_rewritten": time_bounds_rewritten,
                     "time_bounds_issue": time_issue,
-                }
+                },
             }
-        except SecurityError as e:
-            return {
-                "success": False,
-                "sql": sql,
-                "error": str(e),
-                "error_type": "security",
-                "metadata": {
-                    "detected_indicators": detected_indicators,
-                    "model": LLM_CONFIG["model"],
-                    "used_few_shot": use_few_shot,
-                    "used_rules": use_rules,
-                    "used_guards": use_guards,
-                    "used_indicator_knowledge": use_indicator_knowledge,
-                    "used_schema_linking": use_schema_linking,
-                    "used_indicator_rag": use_indicator_rag,
-                    "source_id": runtime.source_id,
-                    "security_role": user_context.role,
-                    "security_operator": user_context.operator_name,
+
+        e = execution["exception"]
+        error_meta = execution.get("error_meta") or {}
+        metadata = dict(base_meta)
+        if execution["status"] == "query":
+            metadata.update(
+                {
+                    "db_duration_ms": error_meta.get("duration_ms"),
+                    "db_error_code": error_meta.get("error_code"),
+                    "db_raw_error": error_meta.get("raw_error"),
                 }
-            }
-        except QueryExecutionError as e:
-            return {
-                "success": False,
-                "sql": sql,
-                "error": str(e),
-                "error_type": f"database_{e.error_type}",
-                "metadata": {
-                    "detected_indicators": detected_indicators,
-                    "model": LLM_CONFIG["model"],
-                    "used_few_shot": use_few_shot,
-                    "used_rules": use_rules,
-                    "used_guards": use_guards,
-                    "used_indicator_knowledge": use_indicator_knowledge,
-                    "used_schema_linking": use_schema_linking,
-                    "used_indicator_rag": use_indicator_rag,
-                    "source_id": runtime.source_id,
-                    "security_role": user_context.role,
-                    "security_operator": user_context.operator_name,
-                    "db_duration_ms": e.metadata.get("duration_ms"),
-                    "db_error_code": e.metadata.get("error_code"),
-                    "db_raw_error": e.metadata.get("raw_error"),
-                }
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "sql": sql,
-                "error": str(e),
-                "error_type": "database",
-                "metadata": {
-                    "detected_indicators": detected_indicators,
-                    "model": LLM_CONFIG["model"],
-                    "used_few_shot": use_few_shot,
-                    "used_rules": use_rules,
-                    "used_guards": use_guards,
-                    "used_indicator_knowledge": use_indicator_knowledge,
-                    "used_schema_linking": use_schema_linking,
-                    "used_indicator_rag": use_indicator_rag,
-                    "source_id": runtime.source_id,
-                    "security_role": user_context.role,
-                    "security_operator": user_context.operator_name,
-                }
-            }
+            )
+        return {
+            "success": False,
+            "sql": sql,
+            "error": str(e),
+            "error_type": execution["error_type"],
+            "metadata": metadata,
+        }
 
     @traceable(
         name="问答链路（流式）",
         run_type="chain",
+        process_inputs=trim_run_inputs,
         reduce_fn=reduce_sse,
     )
     def run_stream(
@@ -455,10 +598,46 @@ class ChatBISystem:
 
         yield _sse_event("sql_done", {"sql": sql})
 
-        # 6. 执行 SQL
-        try:
-            columns, results = runtime.db.execute(sql, user=user_context, question=user_question)
-            db_info = getattr(runtime.db, "last_query_info", {})
+        # 6. 执行 SQL（可修复报错时带错误信息让 LLM 重写并有限次重试）
+        execution_gen = self._execute_sql_with_repair(
+            runtime=runtime,
+            user_question=user_question,
+            sql=sql,
+            system_msg=system_msg,
+            prompt=prompt,
+            user_context=user_context,
+            time_issue=time_issue,
+        )
+        execution = None
+        while True:
+            try:
+                _event_type, event_payload = next(execution_gen)
+            except StopIteration as stop:
+                execution = stop.value
+                break
+            yield _sse_event("sql_rewrite", event_payload)
+
+        sql = execution["sql"]
+        time_issue = execution["time_issue"]
+        repair_meta = {
+            "sql_repair_attempts": execution["sql_repair_attempts"],
+            "sql_repair_errors": execution["sql_repair_errors"],
+        }
+        base_meta = {
+            "detected_indicators": detected_indicators,
+            "model": LLM_CONFIG["model"],
+            "used_indicator_knowledge": use_indicator_knowledge,
+            "used_schema_linking": use_schema_linking,
+            "used_indicator_rag": use_indicator_rag,
+            "source_id": runtime.source_id,
+            "security_role": user_context.role,
+            "security_operator": user_context.operator_name,
+            **repair_meta,
+        }
+        if execution["status"] == "success":
+            columns = execution["columns"]
+            results = execution["results"]
+            db_info = execution["db_info"]
             rows_dict = [dict(zip(columns, row)) for row in results]
             yield _sse_event("result", {
                 "columns": columns,
@@ -467,79 +646,46 @@ class ChatBISystem:
                 "metadata": {
                     "time_bounds_rewritten": time_bounds_rewritten,
                     "time_bounds_issue": time_issue,
-                    "detected_indicators": detected_indicators,
-                    "model": LLM_CONFIG["model"],
-                    "used_few_shot": use_few_shot,
-                    "used_rules": use_rules,
-                    "used_guards": use_guards,
-                    "used_indicator_knowledge": use_indicator_knowledge,
-                    "used_schema_linking": use_schema_linking,
-                    "used_indicator_rag": use_indicator_rag,
-                    "source_id": runtime.source_id,
-                    "security_role": user_context.role,
-                    "security_operator": user_context.operator_name,
+                    **base_meta,
                     "db_duration_ms": db_info.get("duration_ms"),
                     "db_slow_query": db_info.get("slow_query", False),
                     "db_explain_plan": db_info.get("explain_plan", []),
                     "db_truncated": db_info.get("truncated", False),
                 }
             })
-        except SecurityError as e:
-            yield _sse_event("error", {
-                "error": str(e),
-                "error_type": "security",
-                "sql": sql,
-                "metadata": {
-                    "detected_indicators": detected_indicators,
-                    "model": LLM_CONFIG["model"],
-                    "used_indicator_knowledge": use_indicator_knowledge,
-                    "used_schema_linking": use_schema_linking,
-                    "used_indicator_rag": use_indicator_rag,
-                    "source_id": runtime.source_id,
-                    "security_role": user_context.role,
-                    "security_operator": user_context.operator_name,
+            return
+
+        e = execution["exception"]
+        error_meta = execution.get("error_meta") or {}
+        metadata = dict(base_meta)
+        if execution["status"] == "query":
+            metadata.update(
+                {
+                    "db_duration_ms": error_meta.get("duration_ms"),
+                    "db_error_code": error_meta.get("error_code"),
+                    "db_raw_error": error_meta.get("raw_error"),
                 }
-            })
-        except QueryExecutionError as e:
-            yield _sse_event("error", {
-                "error": str(e),
-                "error_type": f"database_{e.error_type}",
-                "sql": sql,
-                "metadata": {
-                    "detected_indicators": detected_indicators,
-                    "model": LLM_CONFIG["model"],
-                    "used_indicator_knowledge": use_indicator_knowledge,
-                    "used_schema_linking": use_schema_linking,
-                    "used_indicator_rag": use_indicator_rag,
-                    "source_id": runtime.source_id,
-                    "security_role": user_context.role,
-                    "security_operator": user_context.operator_name,
-                    "db_duration_ms": e.metadata.get("duration_ms"),
-                    "db_error_code": e.metadata.get("error_code"),
-                    "db_raw_error": e.metadata.get("raw_error"),
-                }
-            })
-        except Exception as e:
-            yield _sse_event("error", {
-                "error": str(e),
-                "error_type": "database",
-                "sql": sql,
-                "metadata": {
-                    "detected_indicators": detected_indicators,
-                    "model": LLM_CONFIG["model"],
-                    "used_indicator_knowledge": use_indicator_knowledge,
-                    "used_schema_linking": use_schema_linking,
-                    "used_indicator_rag": use_indicator_rag,
-                    "source_id": runtime.source_id,
-                    "security_role": user_context.role,
-                    "security_operator": user_context.operator_name,
-                }
-            })
+            )
+        yield _sse_event("error", {
+            "error": str(e),
+            "error_type": execution["error_type"],
+            "sql": sql,
+            "metadata": metadata,
+        })
 
 
 def _sse_event(event_type: str, data: dict) -> str:
     """构造 SSE 格式的事件字符串"""
     return f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False, default=_json_serializer)}\n\n"
+
+
+def _drain_execution_events(gen: Generator) -> dict:
+    """排干 _execute_sql_with_repair：非流式路径丢弃中间重写事件，取回最终结果。"""
+    try:
+        while True:
+            next(gen)
+    except StopIteration as stop:
+        return stop.value
 
 
 def _json_serializer(obj):

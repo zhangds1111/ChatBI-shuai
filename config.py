@@ -7,11 +7,14 @@
 from __future__ import annotations
 
 import copy
+import logging
 import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger("chatbi.config")
 
 
 def _build_default_db_source() -> dict[str, object]:
@@ -60,6 +63,8 @@ APP_CONFIG = {
         "schema_linking": os.getenv("FEATURE_SCHEMA_LINKING", "true").lower() == "true",
         "indicator_rag": os.getenv("FEATURE_INDICATOR_RAG", "false").lower() == "true",
     },
+    # 执行报错后让 LLM 重写并重试的最大次数；0 即关闭（与旧行为一致）
+    "sql_repair_max_retries": int(os.getenv("SQL_REPAIR_MAX_RETRIES", 2)),
     # ---- 安全（SQL 校验 / 行级权限 / 令牌）----
     "security": {
         # 返回行数上限：无 LIMIT 自动补齐，超过上限压到上限
@@ -110,3 +115,25 @@ def get_database_source_config(
 DB_CONFIG = get_database_source_config()
 DB_RUNTIME_CONFIG = APP_CONFIG["database"]["runtime"]
 LLM_CONFIG = APP_CONFIG["llm"]
+
+
+def _check_timeout_alignment() -> None:
+    """启动时校验 socket 读超时必须大于 SQL 执行超时，否则 30s 的执行超时形同虚设。"""
+    read_timeout_s = DB_CONFIG.get("read_timeout")
+    query_timeout_ms = APP_CONFIG.get("security", {}).get("query_timeout_ms", 30000)
+    if read_timeout_s is None or query_timeout_ms is None:
+        return
+    try:
+        if int(read_timeout_s) * 1000 <= int(query_timeout_ms):
+            logger.warning(
+                "DB_READ_TIMEOUT=%ss 小于或等于 QUERY_TIMEOUT_MS=%sms，"
+                "慢查询会被 socket 读超时先打断，执行超时设置将失效；"
+                "请把 DB_READ_TIMEOUT 调大到大于 QUERY_TIMEOUT_MS/1000 秒。",
+                read_timeout_s,
+                query_timeout_ms,
+            )
+    except (TypeError, ValueError):
+        return
+
+
+_check_timeout_alignment()

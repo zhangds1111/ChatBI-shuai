@@ -15,7 +15,7 @@
 | 规则 | 说明 |
 |------|------|
 | 仅单条 SELECT | 支持 `WITH ... SELECT`、`UNION`（各分支必须是 SELECT）；多语句、DDL/DML 一律拒绝 |
-| 表白名单 | 只允许 `security_policy.json` 里 `allowed_tables` 列出的 9 张表；CTE 名称不算真实表 |
+| 表白名单 | 只允许 `security_policy.json` 里 `allowed_tables` 列出的 9 张表；CTE 名称不算真实表，但**禁止 CTE 与数据表白名单 / 禁止 schema / 行级权限表同名**（防借同名 CTE 绕过行级过滤，所有角色一律拒绝） |
 | 禁止库名前缀 | `a.b` 形式一律拒绝；`information_schema` / `mysql` / `performance_schema` / `sys` 一律拒绝 |
 | 函数黑名单 | `SLEEP` / `BENCHMARK` / `LOAD_FILE` / `GET_LOCK` / `RELEASE_LOCK` / `UUID_SHORT`（大小写不敏感，按 AST 函数名判断）；`REPLACE()` 函数允许，`REPLACE INTO` 语句拒绝 |
 | 禁止 INTO / 变量 | `INTO OUTFILE` / `INTO DUMPFILE` / `INTO @var`、`@@` 系统变量、用户变量及赋值 |
@@ -126,7 +126,23 @@ DB_NAME="chatbi_demo"
 - 慢查询 EXPLAIN 只对已通过校验的最终 SQL 执行。
 - 审计日志：logger `chatbi.audit`，JSON 行输出（时间、user_id、role、operator_name、原始问题、原始 SQL、最终 SQL、是否拦截及原因、耗时、返回行数、是否截断），**不记录结果数据**。
 
-## 6. 已知边界 / 需要决策
+## 6. 追踪与数据合规（LangSmith）
+
+开启 `LANGSMITH_TRACING=true` 后，各阶段 span 会把输入输出上传到 LangSmith。默认**只上传 SQL 文本、问题、行数、耗时等元数据，不上传查询结果行**：
+
+- `DatabaseClient.execute`（span「SQL执行」）：输入只保留 `sql` / `question`（用户上下文只保留 `role` 字符串，不上传 `user_id` / `operator_name`）；输出只保留列名与 `row_count`，任何结果行都不会离开本机。
+- 单条问答链路（span「问答链路」）：默认丢弃全部结果行，只保留 `row_count`。本地调试如需在 trace 里看样本数据，可设 `LANGSMITH_TRACE_ROWS=true`，此时保留前 5 行；**生产环境务必保持默认 `false`**。
+- Agent 多步链路：步骤执行 / 结果汇总 / 报告生成等 span 的步骤结果只上传状态、列名与行数，中间结果正文不进 trace。
+- 结果格式化 span：只上传列名、行数与文本长度，不上传表格正文。
+
+注意：**报告生成阶段会把聚合结果发给云端大模型**（用于生成分析报告文本），这是业务功能本身决定的。系统只把每步最多 3 行预览和一行摘要放进 prompt（`report_generator._compress_step_result`），不会把整表结果发给云端；若结果不允许出域，请关闭报告生成或改用私有化部署的模型。
+
+生产环境建议：
+
+- 使用私有化的 `LANGSMITH_ENDPOINT` 指向自托管/内网网关，数据不出内网；或
+- 直接关闭追踪（`LANGSMITH_TRACING=false`，缺省即关闭）。
+
+## 7. 已知边界 / 需要决策
 
 - 敏感列名单当前为 `dim_products.unit_cost`、`dim_products.head_freight_cost`（`security_policy.json` 的 `restricted_columns`），**待业务确认**。
 - `masked_columns`（输出脱敏，默认 `customer_phone` / `customer_email`）目前只对非 admin 角色生效，当前模拟表结构里还没有这些列。
